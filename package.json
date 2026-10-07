@@ -1,0 +1,20 @@
+{
+  "name": "ge-alerter",
+  "private": true,
+  "description": "Desktop notifications from Gemini Enterprise agents and workflows: an MCP server on Cloud Run plus a Chrome PWA, built on Firebase (zero cost when idle).",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspace server",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev:server": "npm run dev --workspace server",
+    "dev:web": "npm run dev --workspace web"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
