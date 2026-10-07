@@ -167,12 +167,15 @@ fi
 # -------------------------------------------------------------------- web
 if [[ "${ONLY:-}" != "server" ]]; then
   log "Building the PWA"
-  printf '%s' "$WEB_CONFIG" | DATABASE_URL="$DATABASE_URL" PUBLIC_URL="$PUBLIC_URL" ALLOWED_EMAIL_DOMAINS="$ALLOWED_EMAIL_DOMAINS" OUT="$ROOT/web/.env.production.local" node -e "
+  # The sign-in helper is served from the app's own origin (Hosting provides /__/auth on every site) rather than
+  # <project>.firebaseapp.com: a cross-origin auth domain fails in browsers that partition storage and in embedded
+  # webviews with "missing initial state". Google's OAuth client must list this origin's handler, see the summary.
+  printf '%s' "$WEB_CONFIG" | AUTH_DOMAIN="$SITE.web.app" DATABASE_URL="$DATABASE_URL" PUBLIC_URL="$PUBLIC_URL" ALLOWED_EMAIL_DOMAINS="$ALLOWED_EMAIL_DOMAINS" OUT="$ROOT/web/.env.production.local" node -e "
     let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{
       const c=JSON.parse(s), e=process.env;
       const lines={
         NEXT_PUBLIC_FIREBASE_API_KEY:c.apiKey,
-        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:c.authDomain,
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:e.AUTH_DOMAIN,
         NEXT_PUBLIC_FIREBASE_DATABASE_URL:e.DATABASE_URL,
         NEXT_PUBLIC_FIREBASE_PROJECT_ID:c.projectId,
         NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID:c.messagingSenderId,
@@ -239,6 +242,11 @@ GE Alerter is deployed.
 
 Google sign-in in Firebase Auth: $GOOGLE_SIGNIN
 $( [[ "$GOOGLE_SIGNIN" != enabled ]] && echo "  Enable it: https://console.firebase.google.com/project/$PROJECT_ID/authentication/providers" )
+Once, in https://console.cloud.google.com/apis/credentials?project=$PROJECT_ID open the OAuth 2.0 client that Firebase
+created ("Web client (auto created by Google Service)") and add
+  Authorized JavaScript origin:  $WEB_URL
+  Authorized redirect URI:       $WEB_URL/__/auth/handler
+so Google sign-in can return to the app's own domain. (No API exists for this.)
 
 Gemini Enterprise custom MCP server data store:
   MCP server URL:      $PUBLIC_URL/mcp

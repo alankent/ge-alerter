@@ -1,6 +1,6 @@
 'use client';
 
-import { onAuthStateChanged, signInWithPopup, signOut as fbSignOut, type User } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut as fbSignOut, type User } from 'firebase/auth';
 import { ref, update } from 'firebase/database';
 import { useEffect, useState } from 'react';
 import { allowedDomainsText, auth, db, googleProvider, isAllowedEmail, isConfigured } from './firebase';
@@ -54,6 +54,13 @@ export function useAuth(): AuthState {
       try {
         await signInWithPopup(auth(), googleProvider);
       } catch (e) {
+        const code = (e as { code?: string }).code;
+        if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
+          // Embedded webviews and some installed-PWA windows cannot open popups; the auth domain is this origin,
+          // so a full-page redirect is reliable there.
+          await signInWithRedirect(auth(), googleProvider);
+          return;
+        }
         setError(e instanceof Error ? e.message : String(e));
       }
     },

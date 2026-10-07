@@ -59,7 +59,13 @@ REST APIs, so the Firebase CLI is not required.
    named `<project>-ge-alerter`, override with `APP_NAME`) and never touches the project's defaults. The project does
    not need to be the one where Gemini Enterprise is installed; see "Where to deploy" in `docs/ARCHITECTURE.md`.
 2. Switch it to the **Blaze** plan. Cloud Run needs billing enabled; actual usage stays inside the free tiers.
-3. **Authentication → Get started → Sign-in method → Google → Enable.** This is the one step with no API.
+3. **Authentication → Get started → Sign-in method → Google → Enable.**
+4. After the first bootstrap run, in the Google Cloud console under **APIs & Services → Credentials** open the OAuth 2.0
+   client Firebase created ("Web client (auto created by Google Service)") and add the app's origin
+   `https://<APP_NAME>.web.app` as an authorized JavaScript origin and `https://<APP_NAME>.web.app/__/auth/handler`
+   as an authorized redirect URI. The PWA signs in through its own domain rather than `<project>.firebaseapp.com`,
+   which avoids the "missing initial state" failure in storage-partitioned browsers and embedded webviews. The bootstrap
+   prints the exact values. These two steps have no API.
 
 ### 2. Run the bootstrap
 
