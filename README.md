@@ -168,3 +168,9 @@ suite, which drives the whole thing end to end.
 | Authentication | $0 | Google sign-in is free |
 
 No SQL instance, no always-on VM, no Pub/Sub subscription to pay for.
+
+## CI
+
+`docs/github-workflow-ci.yml` is a ready-made GitHub Actions workflow (typecheck, tests, builds, container build). Move
+it to `.github/workflows/ci.yml` and commit; it could not be pushed from the session that created this repo because
+that token lacks the `workflow` scope.
