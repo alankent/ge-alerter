@@ -125,18 +125,27 @@ The first time Gemini Enterprise uses the connector it sends you to the PWA's co
 account you use for Gemini Enterprise and click **Allow**. The server issues a refreshable token bound to your user, so
 notifications from your scheduled runs land in your inbox and nobody else's.
 
-### 4b. Try it from Claude Code
+### 4b. Try it from Claude
 
-The same OAuth client works from Claude Code, which calls back to `http://localhost:8765/callback` (change the port
-with `MCP_CALLBACK_PORT` when running the bootstrap). On your laptop, with the values the bootstrap printed:
+The same OAuth client works from Claude. The server allow-lists Claude's callbacks (`https://claude.ai/api/mcp/auth_callback`,
+`https://claude.com/api/mcp/auth_callback`) and Claude Code's local one (`http://localhost:8765/callback`; change the port
+with `MCP_CALLBACK_PORT` when running the bootstrap).
+
+**claude.ai, the apps and Claude Code on the web:** in [Customize → Connectors](https://claude.ai/customize/connectors) add a
+custom connector with the MCP server URL `https://SERVER/mcp`; under **Advanced settings** enter the client ID and the
+client secret (the server does not support dynamic client registration). Connect, sign in with an allowed Google account
+and click **Allow**. New Claude Code web sessions then see the connector's tools.
+
+**Claude Code on a laptop:** with the values the bootstrap printed:
 
 ```bash
 claude mcp add --transport http --client-id CLIENT_ID --client-secret --callback-port 8765 ge-alerter https://SERVER/mcp
 ```
 
-It prompts for the client secret and stores it in your keychain. Then run `/mcp` in Claude Code, pick **ge-alerter**
-and sign in with an allowed Google account; the tools `send_notification`, `list_notifications` and
-`mark_notification_read` appear. Requires Claude Code 2.1.231 or later.
+It prompts for the client secret and stores it in your keychain. Then run `/mcp`, pick **ge-alerter** and sign in.
+Requires Claude Code 2.1.231 or later.
+
+Either way the tools `send_notification`, `list_notifications` and `mark_notification_read` appear.
 
 ### 5. Use it from an agent or workflow
 
