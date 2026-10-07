@@ -50,13 +50,13 @@ function browserLabel(): string {
  * under the user's devices so the server can push to it.
  */
 export async function enablePush(uid: string): Promise<{ token: string }> {
-  if (!VAPID_KEY) throw new Error('NEXT_PUBLIC_FIREBASE_VAPID_KEY is not set');
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') throw new Error('Notification permission was not granted');
   const m = await messaging();
   if (!m) throw new Error('Push messaging is not supported in this browser');
   const registration = await registerServiceWorker();
-  const token = await getToken(m, { vapidKey: VAPID_KEY, serviceWorkerRegistration: registration });
+  // Without a project VAPID key the Firebase SDK uses its built-in default key, which works with FCM.
+  const token = await getToken(m, { ...(VAPID_KEY ? { vapidKey: VAPID_KEY } : {}), serviceWorkerRegistration: registration });
   await set(ref(db(), `users/${uid}/devices/${deviceKey()}`), {
     token,
     userAgent: navigator.userAgent,

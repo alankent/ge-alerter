@@ -16,3 +16,10 @@ Conventions:
   `server/src/store/types.ts` so tests stay Firebase-free.
 - `web/public/sw.js` and `web/lib/notificationDisplay.ts` build notifications the same way; change both together.
 - Do not add always-on infrastructure; the design goal is zero cost while idle.
+
+Deploying (cloud sessions):
+
+- Credentials come from environment variables `GCP_PROJECT_ID` and `GCP_SA_KEY` (service account JSON) set in the
+  Claude Code environment settings. Never write them to a file in the repo, print them, or commit them.
+- Run `./scripts/bootstrap.sh` from the repo root. It is idempotent; `ONLY=server` or `ONLY=web` deploys one half.
+- Do not print the OAuth client secret; tell the user the `gcloud secrets versions access` command instead.

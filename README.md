@@ -30,7 +30,7 @@ costs nothing while nothing is happening.
 | `server/` | Node/TypeScript service for Cloud Run. Exposes the MCP endpoint (`/mcp`, Streamable HTTP), a minimal OAuth 2.0 authorization server that Gemini Enterprise's custom MCP connector requires, and a REST fallback (`/api/notify`). Writes to Realtime Database and sends Web Push via Firebase Cloud Messaging. |
 | `web/` | Next.js PWA, exported as static files for Firebase Hosting. Google sign-in, live inbox, push registration, the OAuth consent screen, and a service worker that renders notifications with action buttons. |
 | `firebase.json`, `database.rules.json` | Hosting config and database security rules. |
-| `scripts/deploy-server.sh` | One-shot Cloud Run deploy. |
+| `scripts/bootstrap.sh` | Provisions and deploys everything into one project; re-run to redeploy. |
 | `docs/ARCHITECTURE.md` | Design, data flows, alternatives considered, and known gaps. |
 
 ## MCP tools exposed to Gemini Enterprise
@@ -46,49 +46,50 @@ Each notification shows the agent's buttons (or a default **Mark done**), opens 
 
 ## Setup
 
-You need a Firebase project on the Blaze plan (Cloud Run requires billing to be enabled; actual usage stays inside the
-free tiers), the Firebase CLI, and the gcloud CLI.
+Deployment is one idempotent script, `scripts/bootstrap.sh`. It enables the APIs, adds Firebase, creates the Realtime
+Database, web app and Hosting site, generates the OAuth client secret in Secret Manager, creates a least-privilege
+runtime service account, deploys the server to Cloud Run, builds and deploys the PWA and database rules, and prints the
+values for Gemini Enterprise. Re-run it to redeploy.
 
-### 1. Firebase project
+### 1. Project (console clicks, once)
 
-1. Create a project at <https://console.firebase.google.com> (or reuse one).
-2. **Authentication** → Sign-in method → enable **Google**. Under Settings → Authorized domains, add the Hosting domain
-   (`PROJECT_ID.web.app`).
-3. **Realtime Database** → Create database (locked mode; the rules in this repo are deployed below).
-4. **Project settings → Cloud Messaging → Web Push certificates** → Generate key pair. This is the VAPID key.
-5. **Project settings → General → Your apps** → Add a Web app. Copy the config values.
+1. In the [Firebase console](https://console.firebase.google.com) create a project, or add Firebase to an existing
+   Google Cloud project. Use a dedicated project for this.
+2. Switch it to the **Blaze** plan. Cloud Run needs billing enabled; actual usage stays inside the free tiers.
+3. **Authentication → Get started → Sign-in method → Google → Enable.** This is the one step with no API.
 
-### 2. Server on Cloud Run
+### 2. Run the bootstrap
 
-```bash
-gcloud auth login
-gcloud config set project PROJECT_ID
-gcloud services enable run.googleapis.com cloudbuild.googleapis.com secretmanager.googleapis.com artifactregistry.googleapis.com
-
-export PROJECT_ID=your-project
-export WEB_URL=https://your-project.web.app
-export OAUTH_CLIENT_ID=$(openssl rand -hex 16)
-export OAUTH_CLIENT_SECRET=$(openssl rand -base64 32)
-./scripts/deploy-server.sh
-```
-
-The script prints the values to paste into Gemini Enterprise. Keep the client ID and secret somewhere safe.
-
-The Cloud Run service runs as the default compute service account, which already has access to Realtime Database, Cloud
-Messaging and Auth in the same project. Zero minimum instances means zero cost while idle.
-
-### 3. PWA on Firebase Hosting
+Either run it yourself, for example in [Cloud Shell](https://shell.cloud.google.com) where gcloud is already signed in:
 
 ```bash
-cp web/.env.example web/.env.local      # fill in Firebase web config, VAPID key, and the Cloud Run URL
-cp .firebaserc.example .firebaserc      # set your project id
-npm install
-npm run build --workspace web
-firebase deploy --only hosting,database
+git clone https://github.com/alankent/ge-alerter && cd ge-alerter
+GCP_PROJECT_ID=your-project ./scripts/bootstrap.sh
 ```
 
-Open `https://PROJECT_ID.web.app`, sign in with Google, click **Enable notifications**, and set the **Default link** to
-your Gemini Enterprise app URL. Install the PWA from Chrome's address bar if you want it as its own window.
+Or let a Claude Code cloud session run it with a service account key. Create the key in Cloud Shell:
+
+```bash
+PROJECT=your-project
+gcloud iam service-accounts create ge-alerter-deployer --project $PROJECT
+gcloud projects add-iam-policy-binding $PROJECT \
+  --member serviceAccount:ge-alerter-deployer@$PROJECT.iam.gserviceaccount.com --role roles/owner
+gcloud iam service-accounts keys create key.json \
+  --iam-account ge-alerter-deployer@$PROJECT.iam.gserviceaccount.com
+cat key.json   # copy into the environment setting below, then: rm key.json
+```
+
+Add two environment variables in the Claude Code environment settings, never in git: `GCP_PROJECT_ID` and `GCP_SA_KEY`
+(the whole JSON). Start a new session and ask it to deploy. Delete the key in the console when you are done; the
+deployed app does not use it.
+
+If your organization blocks service account keys (`iam.disableServiceAccountKeyCreation`) or public Cloud Run services
+(domain restricted sharing), use a project outside that organization or run the script yourself.
+
+### 3. Turn on notifications
+
+Open the printed App URL, sign in with Google, click **Enable notifications**, and set the **Default link** to your
+Gemini Enterprise app URL.
 
 ### 4. Connect Gemini Enterprise
 
@@ -100,7 +101,7 @@ the Discovery Engine Editor role) and enter:
 | MCP server URL | `https://SERVER/mcp` |
 | Authorization URL | `https://SERVER/oauth/authorize` |
 | Token URL | `https://SERVER/oauth/token` |
-| Client ID / Client secret | the values from step 2 |
+| Client ID / Client secret | printed by the bootstrap; the secret is read with the printed `gcloud secrets` command |
 | Scopes | `notifications` |
 | PKCE | optional, supported (S256) |
 
