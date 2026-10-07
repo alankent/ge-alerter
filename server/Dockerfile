@@ -1,6 +1,9 @@
 # Build stage: compile TypeScript.
 FROM node:22-slim AS build
 WORKDIR /app
+# The npm bundled with node:22 (10.9.x) crashes resolving this dependency tree
+# ("Cannot read properties of null (reading 'edgesOut')"), so upgrade it first.
+RUN npm install -g npm@11.21.0 --no-audit --no-fund
 COPY package.json ./
 RUN npm install --no-package-lock --no-audit --no-fund
 COPY tsconfig.json ./
