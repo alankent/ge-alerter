@@ -123,5 +123,11 @@ export interface Pusher {
 
 export interface Identity {
   /** Verifies a Firebase Auth ID token issued to the PWA and returns the user. */
-  verifyIdToken(idToken: string): Promise<{ uid: string; email?: string }>;
+  verifyIdToken(idToken: string): Promise<VerifiedUser>;
+}
+
+export interface VerifiedUser {
+  uid: string;
+  email?: string;
+  emailVerified?: boolean;
 }

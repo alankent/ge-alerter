@@ -3,7 +3,7 @@
 import { onAuthStateChanged, signInWithPopup, signOut as fbSignOut, type User } from 'firebase/auth';
 import { ref, update } from 'firebase/database';
 import { useEffect, useState } from 'react';
-import { auth, db, googleProvider, isConfigured } from './firebase';
+import { allowedDomainsText, auth, db, googleProvider, isAllowedEmail, isConfigured } from './firebase';
 
 export interface AuthState {
   user: User | null;
@@ -24,9 +24,17 @@ export function useAuth(): AuthState {
       return;
     }
     return onAuthStateChanged(auth(), (u) => {
+      if (u && !isAllowedEmail(u.email, u.emailVerified)) {
+        setError(`${u.email ?? 'That account'} is not allowed. Sign in with your ${allowedDomainsText} account.`);
+        setUser(null);
+        setLoading(false);
+        void fbSignOut(auth());
+        return;
+      }
       setUser(u);
       setLoading(false);
       if (u) {
+        setError(null);
         // Keep a profile so the inbox can show who is signed in; the server never needs it.
         void update(ref(db(), `users/${u.uid}/profile`), {
           email: u.email ?? null,
@@ -43,7 +51,6 @@ export function useAuth(): AuthState {
     loading,
     error,
     async signIn() {
-      setError(null);
       try {
         await signInWithPopup(auth(), googleProvider);
       } catch (e) {

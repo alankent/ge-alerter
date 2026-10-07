@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { CLIENT_ID, CLIENT_SECRET, ID_TOKEN, REDIRECT_URI, WEB_URL, obtainTokens, startTestServer, type TestContext } from './helpers.js';
+import { CLIENT_ID, CLIENT_SECRET, ID_TOKEN, OUTSIDER_ID_TOKEN, REDIRECT_URI, WEB_URL, obtainTokens, startTestServer, type TestContext } from './helpers.js';
+import { isAllowedUser } from '../src/access.js';
 
 let ctx: TestContext;
 beforeEach(async () => {
@@ -148,5 +149,37 @@ describe('token endpoint', () => {
     const r = await fetch(`${ctx.baseUrl}/api/me`, { headers: { authorization: `Bearer ${body.access_token}` } });
     expect(r.status).toBe(401);
     expect(r.headers.get('www-authenticate')).toContain('resource_metadata=');
+  });
+});
+
+describe('allowed email domains', () => {
+  it('only lets accounts from allowed domains approve a connection', async () => {
+    await ctx.close();
+    ctx = await startTestServer({ allowedEmailDomains: ['example.com'] });
+    const start = async () => {
+      const r = await fetch(`${ctx.baseUrl}/oauth/authorize?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`, { redirect: 'manual' });
+      return new URL(r.headers.get('location') as string).searchParams.get('request') as string;
+    };
+    const decide = (token: string, request: string) =>
+      fetch(`${ctx.baseUrl}/oauth/decision`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ request, approve: true }),
+      });
+
+    const outsider = await decide(OUTSIDER_ID_TOKEN, await start());
+    expect(outsider.status).toBe(403);
+    expect((await outsider.json()).error_description).toContain('@example.com');
+
+    const insider = await decide(ID_TOKEN, await start());
+    expect(insider.status).toBe(200);
+  });
+
+  it('checks domain, verification and case', () => {
+    expect(isAllowedUser({ uid: 'u', email: 'a@IMDigital.com', emailVerified: true }, ['imdigital.com'])).toBe(true);
+    expect(isAllowedUser({ uid: 'u', email: 'a@imdigital.com', emailVerified: false }, ['imdigital.com'])).toBe(false);
+    expect(isAllowedUser({ uid: 'u', email: 'a@imdigital.com.evil.test', emailVerified: true }, ['imdigital.com'])).toBe(false);
+    expect(isAllowedUser({ uid: 'u', email: 'a@sub.imdigital.com', emailVerified: true }, ['imdigital.com'])).toBe(false);
+    expect(isAllowedUser({ uid: 'u' }, [])).toBe(true);
   });
 });

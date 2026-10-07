@@ -9,8 +9,9 @@
  */
 import { Router, type Request, type Response } from 'express';
 import type { Config } from './config.js';
+import { allowedDomainsText, isAllowedUser } from './access.js';
 import { randomToken, safeEqual, sha256, verifyPkce } from './crypto.js';
-import type { Identity, Store } from './store/types.js';
+import type { Identity, Store, VerifiedUser } from './store/types.js';
 
 const PENDING_TTL_MS = 10 * 60 * 1000;
 const CODE_TTL_MS = 5 * 60 * 1000;
@@ -156,6 +157,7 @@ export function createOAuthRouter({ config, store, identity }: Deps): Router {
     res.json({
       clientId: pending.clientId,
       clientName: config.oauthClientName,
+      allowedEmailDomains: config.allowedEmailDomains,
       scope: pending.scope ?? SCOPES.join(' '),
       expiresAt: pending.exp,
     });
@@ -170,11 +172,14 @@ export function createOAuthRouter({ config, store, identity }: Deps): Router {
     if (!header.toLowerCase().startsWith('bearer ')) {
       return oauthError(res, 401, 'unauthorized', 'Missing Firebase ID token');
     }
-    let user: { uid: string; email?: string };
+    let user: VerifiedUser;
     try {
       user = await identity.verifyIdToken(header.slice(7).trim());
     } catch {
       return oauthError(res, 401, 'unauthorized', 'Invalid Firebase ID token');
+    }
+    if (!isAllowedUser(user, config.allowedEmailDomains)) {
+      return oauthError(res, 403, 'forbidden', `Only ${allowedDomainsText(config.allowedEmailDomains)} accounts can connect.`);
     }
 
     const body = (req.body ?? {}) as { request?: unknown; approve?: unknown };

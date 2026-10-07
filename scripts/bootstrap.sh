@@ -12,6 +12,7 @@
 #   ONLY              "server" or "web" to deploy just one half
 #   FIREBASE_VAPID_KEY  your own Web Push key; the Firebase default key is used otherwise
 #   APP_NAME          id for this app's own database instance and hosting site (default <project>-ge-alerter)
+#   ALLOWED_EMAIL_DOMAINS  comma-separated email domains that may sign in (default imdigital.com; set to empty to allow any)
 #
 # The app never touches the project's default database or default hosting site, so it can share a
 # project with other apps.
@@ -19,6 +20,7 @@ set -euo pipefail
 
 PROJECT_ID="${GCP_PROJECT_ID:?Set GCP_PROJECT_ID}"
 REGION="${REGION:-us-central1}"
+ALLOWED_EMAIL_DOMAINS="${ALLOWED_EMAIL_DOMAINS-imdigital.com}"
 SERVICE=ge-alerter-server
 RUNTIME_SA_NAME=ge-alerter-run
 SECRET_NAME=ge-alerter-oauth-client-secret
@@ -132,7 +134,7 @@ if [[ "${ONLY:-}" != "web" ]]; then
     --service-account "$RUNTIME_SA" \
     --allow-unauthenticated \
     --min-instances 0 --max-instances 2 --memory 512Mi --cpu 1 \
-    --set-env-vars "^@^STORE=firebase@FIREBASE_DATABASE_URL=$DATABASE_URL@FIREBASE_PROJECT_ID=$PROJECT_ID@PUBLIC_URL=$PUBLIC_URL@WEB_URL=$WEB_URL@OAUTH_CLIENT_ID=ge-alerter-$PROJECT_NUMBER@OAUTH_CLIENT_NAME=Gemini Enterprise" \
+    --set-env-vars "^@^STORE=firebase@FIREBASE_DATABASE_URL=$DATABASE_URL@FIREBASE_PROJECT_ID=$PROJECT_ID@PUBLIC_URL=$PUBLIC_URL@WEB_URL=$WEB_URL@OAUTH_CLIENT_ID=ge-alerter-$PROJECT_NUMBER@OAUTH_CLIENT_NAME=Gemini Enterprise@ALLOWED_EMAIL_DOMAINS=$ALLOWED_EMAIL_DOMAINS" \
     --set-secrets "OAUTH_CLIENT_SECRET=$SECRET_NAME:latest"
   curl -fsS "$PUBLIC_URL/healthz" >/dev/null && echo "  health check ok"
 fi
@@ -140,7 +142,7 @@ fi
 # -------------------------------------------------------------------- web
 if [[ "${ONLY:-}" != "server" ]]; then
   log "Building the PWA"
-  printf '%s' "$WEB_CONFIG" | DATABASE_URL="$DATABASE_URL" PUBLIC_URL="$PUBLIC_URL" OUT="$ROOT/web/.env.production.local" node -e "
+  printf '%s' "$WEB_CONFIG" | DATABASE_URL="$DATABASE_URL" PUBLIC_URL="$PUBLIC_URL" ALLOWED_EMAIL_DOMAINS="$ALLOWED_EMAIL_DOMAINS" OUT="$ROOT/web/.env.production.local" node -e "
     let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{
       const c=JSON.parse(s), e=process.env;
       const lines={
@@ -152,6 +154,7 @@ if [[ "${ONLY:-}" != "server" ]]; then
         NEXT_PUBLIC_FIREBASE_APP_ID:c.appId,
         NEXT_PUBLIC_FIREBASE_VAPID_KEY:e.FIREBASE_VAPID_KEY||'',
         NEXT_PUBLIC_API_URL:e.PUBLIC_URL,
+        NEXT_PUBLIC_ALLOWED_EMAIL_DOMAINS:e.ALLOWED_EMAIL_DOMAINS,
       };
       require('fs').writeFileSync(e.OUT,Object.entries(lines).map(([k,v])=>k+'='+(v??'')).join('\n')+'\n');
     })"
@@ -159,6 +162,7 @@ if [[ "${ONLY:-}" != "server" ]]; then
 
   log "Deploying hosting and database rules to $APP_NAME"
   (cd "$ROOT" \
+    && ALLOWED_EMAIL_DOMAINS="$ALLOWED_EMAIL_DOMAINS" node scripts/gen-rules.mjs \
     && $FIREBASE target:apply hosting app "$SITE" --project "$PROJECT_ID" >/dev/null \
     && $FIREBASE target:apply database alerts "$APP_NAME" --project "$PROJECT_ID" >/dev/null \
     && $FIREBASE deploy --only "hosting:app,database:alerts" --project "$PROJECT_ID" --non-interactive)

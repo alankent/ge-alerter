@@ -22,6 +22,10 @@ export interface Config {
   refreshTokenTtlSeconds: number;
   /** Secret used to sign per-notification acknowledgement links. */
   ackSecret: string;
+  /**
+   * Email domains allowed to connect, lower case, e.g. ["imdigital.com"]. Empty allows any verified Google account.
+   */
+  allowedEmailDomains: string[];
   /** Which backing store to use. */
   store: 'firebase' | 'memory';
   firebaseDatabaseUrl?: string;
@@ -78,6 +82,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     accessTokenTtlSeconds: intEnv(env, 'ACCESS_TOKEN_TTL_SECONDS', 3600),
     refreshTokenTtlSeconds: intEnv(env, 'REFRESH_TOKEN_TTL_SECONDS', 90 * 24 * 3600),
     ackSecret: env.ACK_SECRET ?? oauthClientSecret ?? 'dev-ack-secret',
+    allowedEmailDomains: (env.ALLOWED_EMAIL_DOMAINS ?? '')
+      .split(',')
+      .map((d) => d.trim().toLowerCase().replace(/^@/, ''))
+      .filter(Boolean),
     store,
     firebaseDatabaseUrl: env.FIREBASE_DATABASE_URL,
     firebaseProjectId: env.FIREBASE_PROJECT_ID ?? env.GOOGLE_CLOUD_PROJECT,

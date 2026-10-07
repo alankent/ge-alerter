@@ -29,7 +29,7 @@ costs nothing while nothing is happening.
 | --- | --- |
 | `server/` | Node/TypeScript service for Cloud Run. Exposes the MCP endpoint (`/mcp`, Streamable HTTP), a minimal OAuth 2.0 authorization server that Gemini Enterprise's custom MCP connector requires, and a REST fallback (`/api/notify`). Writes to Realtime Database and sends Web Push via Firebase Cloud Messaging. |
 | `web/` | Next.js PWA, exported as static files for Firebase Hosting. Google sign-in, live inbox, push registration, the OAuth consent screen, and a service worker that renders notifications with action buttons. |
-| `firebase.json`, `database.rules.json` | Hosting config and database security rules. |
+| `firebase.json`, `database.rules.template.json` | Hosting config and database security rules; `scripts/gen-rules.mjs` fills in the allowed email domains. |
 | `scripts/bootstrap.sh` | Provisions and deploys everything into one project; re-run to redeploy. |
 | `docs/ARCHITECTURE.md` | Design, data flows, alternatives considered, and known gaps. |
 
@@ -87,6 +87,10 @@ deployed app does not use it.
 
 If your organization blocks service account keys (`iam.disableServiceAccountKeyCreation`) or public Cloud Run services
 (domain restricted sharing), use a project outside that organization or run the script yourself.
+
+Only accounts in `ALLOWED_EMAIL_DOMAINS` can sign in, approve the Gemini Enterprise connection, or read data. The
+bootstrap defaults it to `imdigital.com`; pass `ALLOWED_EMAIL_DOMAINS=other.com,imdigital.com` to change it, or an empty
+value to allow any Google account.
 
 ### 3. Turn on notifications
 

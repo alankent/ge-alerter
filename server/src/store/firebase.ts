@@ -14,6 +14,7 @@ import type {
   RefreshToken,
   Store,
   UserSettings,
+  VerifiedUser,
 } from './types.js';
 
 export interface FirebaseOptions {
@@ -209,8 +210,8 @@ export class FcmPusher implements Pusher {
 export class FirebaseIdentity implements Identity {
   constructor(private app: App) {}
 
-  async verifyIdToken(idToken: string): Promise<{ uid: string; email?: string }> {
+  async verifyIdToken(idToken: string): Promise<VerifiedUser> {
     const decoded = await getAuth(this.app).verifyIdToken(idToken);
-    return { uid: decoded.uid, email: decoded.email };
+    return { uid: decoded.uid, email: decoded.email, emailVerified: decoded.email_verified === true };
   }
 }

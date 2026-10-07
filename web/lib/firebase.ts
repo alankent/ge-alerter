@@ -32,7 +32,25 @@ export function db(): Database {
   return getDatabase(app());
 }
 
+/** Lower-case email domains allowed to use the app, e.g. ["imdigital.com"]. Empty allows any Google account. */
+export const ALLOWED_EMAIL_DOMAINS = (process.env.NEXT_PUBLIC_ALLOWED_EMAIL_DOMAINS ?? '')
+  .split(',')
+  .map((d) => d.trim().toLowerCase().replace(/^@/, ''))
+  .filter(Boolean);
+
+export function isAllowedEmail(email: string | null | undefined, verified: boolean): boolean {
+  if (ALLOWED_EMAIL_DOMAINS.length === 0) return true;
+  if (!email || !verified) return false;
+  return ALLOWED_EMAIL_DOMAINS.includes(email.slice(email.lastIndexOf('@') + 1).toLowerCase());
+}
+
+export const allowedDomainsText = ALLOWED_EMAIL_DOMAINS.map((d) => `@${d}`).join(' or ');
+
 export const googleProvider = new GoogleAuthProvider();
+// Steer Google's account chooser to the company domain. This is only a hint; the database rules and server enforce it.
+googleProvider.setCustomParameters(
+  ALLOWED_EMAIL_DOMAINS.length === 1 ? { hd: ALLOWED_EMAIL_DOMAINS[0], prompt: 'select_account' } : { prompt: 'select_account' },
+);
 
 export async function messaging(): Promise<Messaging | null> {
   if (typeof window === 'undefined') return null;

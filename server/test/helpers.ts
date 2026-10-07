@@ -17,12 +17,14 @@ export const CLIENT_SECRET = 'test-secret';
 export const REDIRECT_URI = 'https://vertexaisearch.cloud.google.com/oauth-redirect';
 export const WEB_URL = 'https://alerter.example.test';
 export const ID_TOKEN = 'id-token-for-alice';
-export const ALICE = { uid: 'alice-uid', email: 'alice@example.com' };
+export const ALICE = { uid: 'alice-uid', email: 'alice@example.com', emailVerified: true };
+export const OUTSIDER_ID_TOKEN = 'id-token-for-mallory';
+export const MALLORY = { uid: 'mallory-uid', email: 'mallory@elsewhere.test', emailVerified: true };
 
 export async function startTestServer(overrides: Partial<Config> = {}): Promise<TestContext> {
   const store = new MemoryStore();
   const pusher = new MemoryPusher();
-  const identity = new MemoryIdentity({ [ID_TOKEN]: ALICE });
+  const identity = new MemoryIdentity({ [ID_TOKEN]: ALICE, [OUTSIDER_ID_TOKEN]: MALLORY });
   const base = loadConfig({
     STORE: 'memory',
     WEB_URL,

@@ -1,0 +1,29 @@
+{
+  "//": "Template. scripts/gen-rules.mjs writes database.rules.json with __ALLOWED_EMAIL__ replaced from ALLOWED_EMAIL_DOMAINS.",
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid __ALLOWED_EMAIL__",
+        ".write": "auth != null && auth.uid == $uid __ALLOWED_EMAIL__",
+        "settings": {
+          "defaultUrl": {
+            ".validate": "newData.isString() && newData.val().length < 2048 && newData.val().matches(/^https?:\\/\\//)"
+          }
+        },
+        "devices": {
+          "$device": {
+            "token": {
+              ".validate": "newData.isString() && newData.val().length < 4096"
+            }
+          }
+        }
+      }
+    },
+    "oauth": {
+      ".read": false,
+      ".write": false
+    }
+  }
+}

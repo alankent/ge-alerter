@@ -44,8 +44,10 @@ Things that can force co-location or extra setup:
   organization.
 - **Organization policies.** Domain-restricted sharing blocks the public Cloud Run service; disabled service account key
   creation blocks key-based deploys. Run the bootstrap as yourself in Cloud Shell in that case.
-- **Production sign-in.** The PWA currently lets any Google account sign in and then only shows that account's own
-  data. For production, restrict sign-in to the company domain and set up the OAuth consent screen accordingly.
+- **Who can use it.** `ALLOWED_EMAIL_DOMAINS` (default `imdigital.com` in the bootstrap) is enforced three times: the
+  Google account chooser is limited to the domain, the server refuses to approve a Gemini Enterprise connection for any
+  other account, and the generated database rules deny reads and writes to anyone else. Someone outside the domain can
+  still complete Google sign-in, but is signed straight back out and can reach no data.
 
 ## Components
 

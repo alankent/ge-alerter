@@ -10,6 +10,7 @@ import type {
   RefreshToken,
   Store,
   UserSettings,
+  VerifiedUser,
 } from './types.js';
 
 /** In-memory store for tests and local development. Nothing survives a restart. */
@@ -103,9 +104,9 @@ export class MemoryPusher implements Pusher {
 
 /** Maps literal "ID tokens" to users. */
 export class MemoryIdentity implements Identity {
-  constructor(private users: Record<string, { uid: string; email?: string }>) {}
+  constructor(private users: Record<string, VerifiedUser>) {}
 
-  async verifyIdToken(idToken: string): Promise<{ uid: string; email?: string }> {
+  async verifyIdToken(idToken: string): Promise<VerifiedUser> {
     const user = this.users[idToken];
     if (!user) throw new Error('invalid id token');
     return user;
