@@ -19,7 +19,7 @@ Conventions:
 
 Deploying (cloud sessions):
 
-- Credentials come from environment variables `GCP_PROJECT_ID` and `GCP_SA_KEY` (service account JSON) set in the
+- Credentials come from environment variables `GCP_PROJECT_ID` and `GCP_SA_KEY` (service account JSON, raw or base64) set in the
   Claude Code environment settings. Never write them to a file in the repo, print them, or commit them.
 - Run `./scripts/bootstrap.sh` from the repo root. It is idempotent; `ONLY=server` or `ONLY=web` deploys one half.
 - Do not print the OAuth client secret; tell the user the `gcloud secrets versions access` command instead.

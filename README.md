@@ -78,11 +78,11 @@ gcloud projects add-iam-policy-binding $PROJECT \
   --member serviceAccount:ge-alerter-deployer@$PROJECT.iam.gserviceaccount.com --role roles/owner
 gcloud iam service-accounts keys create key.json \
   --iam-account ge-alerter-deployer@$PROJECT.iam.gserviceaccount.com
-cat key.json   # copy into the environment setting below, then: rm key.json
+base64 -w0 key.json; echo   # copy into the environment setting below, then: rm key.json
 ```
 
 Add two environment variables in the Claude Code environment settings, never in git: `GCP_PROJECT_ID` and `GCP_SA_KEY`
-(the whole JSON). Start a new session and ask it to deploy. Delete the key in the console when you are done; the
+(the base64 line, or the raw JSON). Start a new session and ask it to deploy. Delete the key in the console when you are done; the
 deployed app does not use it.
 
 If your organization blocks service account keys (`iam.disableServiceAccountKeyCreation`) or public Cloud Run services

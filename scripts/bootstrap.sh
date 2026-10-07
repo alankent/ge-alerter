@@ -3,7 +3,7 @@
 # Safe to re-run: every step checks before it creates, so this is also the redeploy command.
 #
 # Credentials, one of:
-#   GCP_SA_KEY        contents of a service account JSON key (never commit this)
+#   GCP_SA_KEY        a service account JSON key, raw or base64-encoded on one line (never commit this)
 #   (none)            an already-authenticated gcloud, e.g. in Cloud Shell
 # Required:
 #   GCP_PROJECT_ID    the project to deploy into (Firebase must be enabled on it, billing on the Blaze plan)
@@ -34,7 +34,11 @@ if [[ -n "${GCP_SA_KEY:-}" ]]; then
   KEY_FILE="$(mktemp)"
   chmod 600 "$KEY_FILE"
   trap 'rm -f "$KEY_FILE"' EXIT
-  printf '%s' "$GCP_SA_KEY" > "$KEY_FILE"
+  if [[ "$GCP_SA_KEY" =~ ^[[:space:]]*\{ ]]; then
+    printf '%s' "$GCP_SA_KEY" > "$KEY_FILE"
+  else
+    printf '%s' "$GCP_SA_KEY" | base64 -d > "$KEY_FILE"
+  fi
   # A stale token in the environment would override the key.
   unset CLOUDSDK_AUTH_ACCESS_TOKEN
   gcloud auth activate-service-account --key-file "$KEY_FILE" --quiet >/dev/null
