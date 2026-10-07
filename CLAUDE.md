@@ -23,3 +23,8 @@ Deploying (cloud sessions):
   Claude Code environment settings. Never write them to a file in the repo, print them, or commit them.
 - Run `./scripts/bootstrap.sh` from the repo root. It is idempotent; `ONLY=server` or `ONLY=web` deploys one half.
 - Do not print the OAuth client secret; tell the user the `gcloud secrets versions access` command instead.
+- If `GCP_SA_KEY` is not set, Google credentials come from a network secret: the agent proxy attaches tokens to
+  `*.googleapis.com` requests and gcloud runs on the placeholder `CLOUDSDK_AUTH_ACCESS_TOKEN`. There is no key file,
+  so `firebase-tools` cannot authenticate. Before deploying that way, replace the script's `$FIREBASE` calls
+  (addfirebase, apps:create, target:apply, deploy of hosting and database rules) with REST calls through the `api`
+  helper, then verify with a dry run of each step.
