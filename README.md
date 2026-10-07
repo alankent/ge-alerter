@@ -125,6 +125,19 @@ The first time Gemini Enterprise uses the connector it sends you to the PWA's co
 account you use for Gemini Enterprise and click **Allow**. The server issues a refreshable token bound to your user, so
 notifications from your scheduled runs land in your inbox and nobody else's.
 
+### 4b. Try it from Claude Code
+
+The same OAuth client works from Claude Code, which calls back to `http://localhost:8765/callback` (change the port
+with `MCP_CALLBACK_PORT` when running the bootstrap). On your laptop, with the values the bootstrap printed:
+
+```bash
+claude mcp add --transport http --client-id CLIENT_ID --client-secret --callback-port 8765 ge-alerter https://SERVER/mcp
+```
+
+It prompts for the client secret and stores it in your keychain. Then run `/mcp` in Claude Code, pick **ge-alerter**
+and sign in with an allowed Google account; the tools `send_notification`, `list_notifications` and
+`mark_notification_read` appear. Requires Claude Code 2.1.231 or later.
+
 ### 5. Use it from an agent or workflow
 
 Add the MCP data store to your Gemini Enterprise app, then in **Agent Designer** or **Workflow Builder** give the agent
