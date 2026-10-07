@@ -22,11 +22,24 @@ export function deviceKey(): string {
   return key;
 }
 
-export type PushSupport = 'unsupported' | 'denied' | 'default' | 'granted';
+export type PushSupport = 'unsupported' | 'needs-home-screen' | 'denied' | 'default' | 'granted';
+
+/** iPhone and iPad, including iPadOS, which reports itself as a Mac. Every browser there uses WebKit. */
+function isAppleMobile(): boolean {
+  const ua = navigator.userAgent;
+  return /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+}
+
+function isInstalled(): boolean {
+  return window.matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true;
+}
 
 export function pushSupport(): PushSupport {
   if (typeof window === 'undefined') return 'unsupported';
-  if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) return 'unsupported';
+  if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+    // iOS and iPadOS only expose Web Push to web apps opened from the Home Screen.
+    return isAppleMobile() && !isInstalled() ? 'needs-home-screen' : 'unsupported';
+  }
   return Notification.permission as PushSupport;
 }
 

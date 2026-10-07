@@ -45,6 +45,12 @@ export function PushCard({ uid }: { uid: string }) {
     <div className="card">
       <h2>Desktop notifications</h2>
       {support === 'unsupported' && <p className="error">This browser does not support Web Push. Use Chrome, Edge or Firefox on a desktop.</p>}
+      {support === 'needs-home-screen' && (
+        <p className="error">
+          On iPhone and iPad, notifications only work from the Home Screen app. Tap Share, choose Add to Home Screen, then open GE Alerter from the Home
+          Screen and enable notifications there.
+        </p>
+      )}
       {support === 'denied' && (
         <p className="error">Notifications are blocked for this site. Allow them in the browser&apos;s site settings, then reload.</p>
       )}
@@ -60,7 +66,7 @@ export function PushCard({ uid }: { uid: string }) {
             </button>
           </>
         ) : (
-          <button className="primary" type="button" disabled={busy || support === 'unsupported' || support === 'denied'} onClick={() => run(() => enablePush(uid))}>
+          <button className="primary" type="button" disabled={busy || support === 'unsupported' || support === 'needs-home-screen' || support === 'denied'} onClick={() => run(() => enablePush(uid))}>
             Enable notifications
           </button>
         )}
