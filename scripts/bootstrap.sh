@@ -26,8 +26,9 @@ PROJECT_ID="${GCP_PROJECT_ID:?Set GCP_PROJECT_ID}"
 REGION="${REGION:-us-central1}"
 ALLOWED_EMAIL_DOMAINS="${ALLOWED_EMAIL_DOMAINS-imdigital.com}"
 MCP_CALLBACK_PORT="${MCP_CALLBACK_PORT:-8765}"
-# Gemini Enterprise's fixed redirect, plus Claude Code's local callback so the same client works from a laptop.
-OAUTH_REDIRECT_URIS="https://vertexaisearch.cloud.google.com/oauth-redirect,http://localhost:$MCP_CALLBACK_PORT/callback"
+# Gemini Enterprise's fixed redirect, Claude's connector callbacks (claude.ai today, claude.com announced), and Claude
+# Code's local callback, so the same OAuth client serves all of them.
+OAUTH_REDIRECT_URIS="https://vertexaisearch.cloud.google.com/oauth-redirect,https://claude.ai/api/mcp/auth_callback,https://claude.com/api/mcp/auth_callback,http://localhost:$MCP_CALLBACK_PORT/callback"
 SERVICE=ge-alerter-server
 RUNTIME_SA_NAME=ge-alerter-run
 SECRET_NAME=ge-alerter-oauth-client-secret
@@ -247,9 +248,12 @@ Gemini Enterprise custom MCP server data store:
   Client secret:       gcloud secrets versions access latest --secret $SECRET_NAME --project $PROJECT_ID
   Scopes:              notifications
 
-Try it from Claude Code (the secret is prompted for, then kept in your keychain):
-  claude mcp add --transport http --client-id ge-alerter-$PROJECT_NUMBER --client-secret \
-    --callback-port $MCP_CALLBACK_PORT ge-alerter $PUBLIC_URL/mcp
-  then run /mcp and sign in.
+Try it from Claude:
+  claude.ai / Claude Code web: Customize > Connectors > Add custom connector, URL $PUBLIC_URL/mcp,
+    Advanced settings: the client ID and secret above.
+  Claude Code on a laptop (the secret is prompted for, then kept in your keychain):
+    claude mcp add --transport http --client-id ge-alerter-$PROJECT_NUMBER --client-secret \
+      --callback-port $MCP_CALLBACK_PORT ge-alerter $PUBLIC_URL/mcp
+    then run /mcp and sign in.
 ------------------------------------------------------------------------------
 MSG
