@@ -49,7 +49,8 @@ Each notification shows the agent's buttons (or a default **Mark done**), opens 
 Deployment is one idempotent script, `scripts/bootstrap.sh`. It enables the APIs, adds Firebase, creates the Realtime
 Database, web app and Hosting site, generates the OAuth client secret in Secret Manager, creates a least-privilege
 runtime service account, deploys the server to Cloud Run, builds and deploys the PWA and database rules, and prints the
-values for Gemini Enterprise. Re-run it to redeploy.
+values for Gemini Enterprise. Re-run it to redeploy. It needs only gcloud, curl and node: Firebase is driven through its
+REST APIs, so the Firebase CLI is not required.
 
 ### 1. Project (console clicks, once)
 
@@ -84,6 +85,11 @@ base64 -w0 key.json; echo   # copy into the environment setting below, then: rm 
 Add two environment variables in the Claude Code environment settings, never in git: `GCP_PROJECT_ID` and `GCP_SA_KEY`
 (the base64 line, or the raw JSON). Start a new session and ask it to deploy. Delete the key in the console when you are done; the
 deployed app does not use it.
+
+Instead of a key, the environment can hold the service account as a network secret that the session's proxy attaches to
+`*.googleapis.com` requests. Then set only `GCP_PROJECT_ID`; the script works the same way, except that the database
+rules are uploaded from a short Cloud Build step (the proxy does not cover `firebaseio.com`) and the final health check
+cannot reach `run.app` from the session.
 
 If your organization blocks service account keys (`iam.disableServiceAccountKeyCreation`) or public Cloud Run services
 (domain restricted sharing), use a project outside that organization or run the script yourself.

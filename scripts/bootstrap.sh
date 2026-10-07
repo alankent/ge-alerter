@@ -4,7 +4,10 @@
 #
 # Credentials, one of:
 #   GCP_SA_KEY        a service account JSON key, raw or base64-encoded on one line (never commit this)
-#   (none)            an already-authenticated gcloud, e.g. in Cloud Shell
+#   (none)            an already-authenticated gcloud, e.g. in Cloud Shell, or a proxy that attaches Google
+#                     credentials to *.googleapis.com requests (gcloud then runs on a placeholder access token)
+#
+# Only gcloud, curl and node are needed: Firebase is driven through its REST APIs, not the Firebase CLI.
 # Required:
 #   GCP_PROJECT_ID    the project to deploy into (Firebase must be enabled on it, billing on the Blaze plan)
 # Optional:
@@ -24,7 +27,7 @@ ALLOWED_EMAIL_DOMAINS="${ALLOWED_EMAIL_DOMAINS-imdigital.com}"
 SERVICE=ge-alerter-server
 RUNTIME_SA_NAME=ge-alerter-run
 SECRET_NAME=ge-alerter-oauth-client-secret
-FIREBASE="npx -y firebase-tools@15.32.1"
+RUNTIME_SA="$RUNTIME_SA_NAME@$PROJECT_ID.iam.gserviceaccount.com"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # Database instance and hosting site ids are global, 6-30 chars, lowercase letters, digits and hyphens.
 APP_NAME="${APP_NAME:-$(printf '%s' "${PROJECT_ID}-ge-alerter" | tr 'A-Z_' 'a-z-' | cut -c1-30 | sed 's/-*$//')}"
@@ -54,6 +57,19 @@ api() { # api METHOD URL [JSON]
   curl -sS -X "$1" "$2" -H "Authorization: Bearer $(gcloud auth print-access-token)" \
     -H "Content-Type: application/json" -H "X-Goog-User-Project: $PROJECT_ID" ${3:+-d "$3"}
 }
+# Waits for a Firebase Management long-running operation and prints its response.
+wait_op() { # wait_op OPERATION_NAME
+  local op
+  for _ in $(seq 1 60); do
+    op="$(api GET "https://firebase.googleapis.com/v1beta1/$1")"
+    if printf '%s' "$op" | json "v.done===true?'y':''" | grep -q y; then
+      printf '%s' "$op" | json "v.error?(()=>{throw new Error(JSON.stringify(v.error))})():v.response"
+      return
+    fi
+    sleep 2
+  done
+  echo "Timed out waiting for $1" >&2; return 1
+}
 json() { node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const v=JSON.parse(s||'{}');const r=($1);process.stdout.write(r===undefined||r===null?'':typeof r==='string'?r:JSON.stringify(r))})"; }
 
 # ------------------------------------------------------------------- APIs
@@ -67,7 +83,9 @@ gcloud services enable --quiet \
 # --------------------------------------------------------------- Firebase
 log "Making sure Firebase is enabled on the project"
 if ! api GET "https://firebase.googleapis.com/v1beta1/projects/$PROJECT_ID" | grep -q '"projectId"'; then
-  $FIREBASE projects:addfirebase "$PROJECT_ID" --non-interactive
+  OP="$(api POST "https://firebase.googleapis.com/v1beta1/projects/$PROJECT_ID:addFirebase" '{}' | json "v.name")"
+  [[ -n "$OP" ]] || { echo "Could not add Firebase to the project" >&2; exit 1; }
+  wait_op "$OP" >/dev/null
 fi
 
 log "Realtime Database instance $APP_NAME (the project's default database is left alone)"
@@ -83,7 +101,9 @@ echo "  $DATABASE_URL"
 log "Firebase web app"
 APP_ID="$(api GET "https://firebase.googleapis.com/v1beta1/projects/$PROJECT_ID/webApps" | json "(v.apps||[]).find(a=>a.displayName==='GE Alerter' && a.state!=='DELETED')?.appId")"
 if [[ -z "$APP_ID" ]]; then
-  APP_ID="$($FIREBASE apps:create WEB "GE Alerter" --project "$PROJECT_ID" --json | json "v.result.appId")"
+  OP="$(api POST "https://firebase.googleapis.com/v1beta1/projects/$PROJECT_ID/webApps" '{"displayName":"GE Alerter"}' | json "v.name")"
+  [[ -n "$OP" ]] || { echo "Could not create the Firebase web app" >&2; exit 1; }
+  APP_ID="$(wait_op "$OP" | json "v.appId")"
 fi
 WEB_CONFIG="$(api GET "https://firebase.googleapis.com/v1beta1/projects/$PROJECT_ID/webApps/$APP_ID/config")"
 echo "  $APP_ID"
@@ -117,7 +137,6 @@ if [[ "${ONLY:-}" != "web" ]]; then
   fi
 
   log "Runtime service account"
-  RUNTIME_SA="$RUNTIME_SA_NAME@$PROJECT_ID.iam.gserviceaccount.com"
   gcloud iam service-accounts describe "$RUNTIME_SA" >/dev/null 2>&1 \
     || gcloud iam service-accounts create "$RUNTIME_SA_NAME" --display-name "GE Alerter (Cloud Run)" --quiet
   for role in roles/firebasedatabase.admin roles/firebasecloudmessaging.admin roles/firebaseauth.viewer; do
@@ -136,7 +155,8 @@ if [[ "${ONLY:-}" != "web" ]]; then
     --min-instances 0 --max-instances 2 --memory 512Mi --cpu 1 \
     --set-env-vars "^@^STORE=firebase@FIREBASE_DATABASE_URL=$DATABASE_URL@FIREBASE_PROJECT_ID=$PROJECT_ID@PUBLIC_URL=$PUBLIC_URL@WEB_URL=$WEB_URL@OAUTH_CLIENT_ID=ge-alerter-$PROJECT_NUMBER@OAUTH_CLIENT_NAME=Gemini Enterprise@ALLOWED_EMAIL_DOMAINS=$ALLOWED_EMAIL_DOMAINS" \
     --set-secrets "OAUTH_CLIENT_SECRET=$SECRET_NAME:latest"
-  curl -fsS "$PUBLIC_URL/healthz" >/dev/null && echo "  health check ok"
+  if curl -fsS --max-time 30 "$PUBLIC_URL/healthz" >/dev/null 2>&1; then echo "  health check ok"
+  else echo "  (could not reach $PUBLIC_URL/healthz from here; check it in a browser)"; fi
 fi
 
 # -------------------------------------------------------------------- web
@@ -160,12 +180,45 @@ if [[ "${ONLY:-}" != "server" ]]; then
     })"
   (cd "$ROOT" && npm install --no-audit --no-fund --loglevel=error && NEXT_TELEMETRY_DISABLED=1 npm run build --workspace web)
 
-  log "Deploying hosting and database rules to $APP_NAME"
-  (cd "$ROOT" \
-    && ALLOWED_EMAIL_DOMAINS="$ALLOWED_EMAIL_DOMAINS" node scripts/gen-rules.mjs \
-    && $FIREBASE target:apply hosting app "$SITE" --project "$PROJECT_ID" >/dev/null \
-    && $FIREBASE target:apply database alerts "$APP_NAME" --project "$PROJECT_ID" >/dev/null \
-    && $FIREBASE deploy --only "hosting:app,database:alerts" --project "$PROJECT_ID" --non-interactive)
+  log "Deploying hosting to $SITE"
+  # NODE_USE_ENV_PROXY makes fetch honour HTTPS_PROXY (a no-op when none is set).
+  (cd "$ROOT" && NODE_USE_ENV_PROXY=1 GOOGLE_ACCESS_TOKEN="$(gcloud auth print-access-token)" \
+    node --disable-warning=UNDICI-EHPA scripts/deploy-hosting.mjs "$SITE" "$ROOT/web/out")
+
+  log "Deploying database rules to $APP_NAME"
+  (cd "$ROOT" && ALLOWED_EMAIL_DOMAINS="$ALLOWED_EMAIL_DOMAINS" node scripts/gen-rules.mjs)
+  # The rules endpoint lives on firebaseio.com, not googleapis.com, and wants an OAuth token.
+  RULES_RESULT="$(curl -sS -X PUT "$DATABASE_URL/.settings/rules.json" \
+    -H "Authorization: Bearer $(gcloud auth print-access-token)" --data-binary "@$ROOT/database.rules.json")"
+  if printf '%s' "$RULES_RESULT" | grep -q '"status" *: *"ok"'; then
+    echo "  ok"
+  else
+    # A proxy that only covers googleapis.com cannot reach firebaseio.com with credentials. Run the same
+    # PUT from a one-shot Cloud Build step as the runtime service account (which already administers the
+    # database); the build runs for seconds and nothing stays behind.
+    echo "  direct upload failed ($RULES_RESULT); retrying from Cloud Build as $RUNTIME_SA"
+    # No source upload (the runtime account cannot read the deployer's bucket); the rules travel base64-encoded
+    # in a substitution instead.
+    BUILD_CFG="$(mktemp)"
+    cat > "$BUILD_CFG" <<'YAML'
+steps:
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -ec
+      - |
+        printf '%s' "$_RULES_B64" | base64 -d > rules.json
+        curl -fsS -X PUT "$_DATABASE_URL/.settings/rules.json" \
+          -H "Authorization: Bearer $(gcloud auth print-access-token)" --data-binary @rules.json
+serviceAccount: projects/$PROJECT_ID/serviceAccounts/$_RUNTIME_SA
+options:
+  logging: NONE
+YAML
+    gcloud builds submit --no-source --config "$BUILD_CFG" --region "$REGION" --quiet \
+      --substitutions "_DATABASE_URL=$DATABASE_URL,_RUNTIME_SA=$RUNTIME_SA,_RULES_B64=$(base64 -w0 "$ROOT/database.rules.json")" >/dev/null
+    rm -f "$BUILD_CFG"
+    echo "  ok (via Cloud Build)"
+  fi
 fi
 
 # ---------------------------------------------------------------- summary
