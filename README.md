@@ -54,7 +54,9 @@ values for Gemini Enterprise. Re-run it to redeploy.
 ### 1. Project (console clicks, once)
 
 1. In the [Firebase console](https://console.firebase.google.com) create a project, or add Firebase to an existing
-   Google Cloud project. Use a dedicated project for this.
+   Google Cloud project. A shared test project is fine: the app gets its own database instance and hosting site (both
+   named `<project>-ge-alerter`, override with `APP_NAME`) and never touches the project's defaults. The project does
+   not need to be the one where Gemini Enterprise is installed; see "Where to deploy" in `docs/ARCHITECTURE.md`.
 2. Switch it to the **Blaze** plan. Cloud Run needs billing enabled; actual usage stays inside the free tiers.
 3. **Authentication → Get started → Sign-in method → Google → Enable.** This is the one step with no API.
 

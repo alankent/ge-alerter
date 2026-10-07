@@ -21,6 +21,32 @@ That turns out to be a feature. Because every call carries a token bound to the 
 *whose* desktop to notify without any API keys or per-agent configuration, and scheduled runs (which execute under the
 user's credentials) route correctly.
 
+## Where to deploy
+
+The server and PWA do not have to live in the Gemini Enterprise project. Gemini Enterprise reaches a custom MCP server
+over public HTTPS and authenticates with the OAuth client you configure, so any project with a public Cloud Run service
+works. Firebase Auth in the PWA's project is independent of the identity Gemini Enterprise uses; the OAuth consent step
+links the two.
+
+| Stage | Server and PWA | Gemini Enterprise | Notes |
+| --- | --- | --- | --- |
+| Personal dev | a personal or sandbox project | the team's test instance | Any data store you create points at the sandbox URL. Fine for one developer. |
+| Team test | same, or a shared dev project | the team's test instance | Each tester signs in to the PWA and approves the connection once. |
+| Production | a project owned by the team that runs the production Gemini Enterprise, often the same project or a sibling | production instance | Run `scripts/bootstrap.sh` there, register a new data store in production with that project's URLs and secret. |
+
+Things that can force co-location or extra setup:
+
+- **Agent Gateway egress policies.** If the Gemini Enterprise project governs outbound MCP traffic through Agent
+  Registry and Agent Gateway, an admin must register or allow the server's URL, and the app, gateway and registry must be
+  regionally aligned. The server itself still need not move.
+- **Cloud Run IAM instead of public access.** If policy forbids `allUsers` invokers, grant `roles/run.invoker` on the
+  service to the Gemini Enterprise service agent from the other project. Cross-project grants work within one
+  organization.
+- **Organization policies.** Domain-restricted sharing blocks the public Cloud Run service; disabled service account key
+  creation blocks key-based deploys. Run the bootstrap as yourself in Cloud Shell in that case.
+- **Production sign-in.** The PWA currently lets any Google account sign in and then only shows that account's own
+  data. For production, restrict sign-in to the company domain and set up the OAuth consent screen accordingly.
+
 ## Components
 
 ### Server (`server/`, Cloud Run)
