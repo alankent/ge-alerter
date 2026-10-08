@@ -7,6 +7,12 @@
       "$uid": {
         ".read": "auth != null && auth.uid == $uid __ALLOWED_EMAIL__",
         ".write": "auth != null && auth.uid == $uid __ALLOWED_EMAIL__",
+        "notifications": {
+          "//": "The server lists by createdAt (Admin SDK queries still need an index).",
+          ".indexOn": [
+            "createdAt"
+          ]
+        },
         "settings": {
           "defaultUrl": {
             ".validate": "newData.isString() && newData.val().length < 2048 && newData.val().matches(/^https?:\\/\\//)"
@@ -23,7 +29,28 @@
     },
     "oauth": {
       ".read": false,
-      ".write": false
+      ".write": false,
+      "//": "The server sweeps expired entries by exp.",
+      "pending": {
+        ".indexOn": [
+          "exp"
+        ]
+      },
+      "codes": {
+        ".indexOn": [
+          "exp"
+        ]
+      },
+      "tokens": {
+        ".indexOn": [
+          "exp"
+        ]
+      },
+      "refresh": {
+        ".indexOn": [
+          "exp"
+        ]
+      }
     }
   }
 }

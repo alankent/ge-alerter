@@ -22,7 +22,8 @@ const template = JSON.parse(readFileSync(join(root, 'database.rules.template.jso
 delete template['//'];
 const fill = (v) =>
   typeof v === 'string' ? v.replace('__ALLOWED_EMAIL__', condition).trim()
-  : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, fill(x)]))
+  : Array.isArray(v) ? v.map(fill)
+  : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).filter(([k]) => k !== '//').map(([k, x]) => [k, fill(x)]))
   : v;
 writeFileSync(join(root, 'database.rules.json'), JSON.stringify(fill(template), null, 2) + '\n');
 console.log(`database.rules.json written (${domains.length ? domains.join(', ') : 'any signed-in user'})`);
