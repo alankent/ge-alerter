@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Provisions and deploys GE Alerter into one Google Cloud / Firebase project.
+# Provisions and deploys Agent Notifications (repo and resource ids: ge-alerter) into one Google Cloud / Firebase project.
 # Safe to re-run: every step checks before it creates, so this is also the redeploy command.
 #
 # Credentials, one of:
@@ -104,6 +104,7 @@ fi
 echo "  $DATABASE_URL"
 
 log "Firebase web app"
+# "GE Alerter" is the web app's registered display name and how re-runs find it; it is never shown to users.
 APP_ID="$(api GET "https://firebase.googleapis.com/v1beta1/projects/$PROJECT_ID/webApps" | json "(v.apps||[]).find(a=>a.displayName==='GE Alerter' && a.state!=='DELETED')?.appId")"
 if [[ -z "$APP_ID" ]]; then
   OP="$(api POST "https://firebase.googleapis.com/v1beta1/projects/$PROJECT_ID/webApps" '{"displayName":"GE Alerter"}' | json "v.name")"
@@ -235,7 +236,7 @@ GOOGLE_SIGNIN="$(api GET "https://identitytoolkit.googleapis.com/admin/v2/projec
 cat <<MSG
 
 ------------------------------------------------------------------------------
-GE Alerter is deployed.
+Agent Notifications is deployed.
 
   App:          $WEB_URL
   MCP server:   $PUBLIC_URL

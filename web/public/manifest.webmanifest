@@ -1,7 +1,7 @@
 {
-  "name": "GE Alerter",
-  "short_name": "GE Alerter",
-  "description": "Desktop notifications from your Gemini Enterprise agents and workflows.",
+  "name": "Agent Notifications",
+  "short_name": "Agents",
+  "description": "Notifications from your Gemini Enterprise agents and workflows.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

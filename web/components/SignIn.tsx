@@ -8,8 +8,8 @@ export function SignIn({ onSignIn, error, message }: { onSignIn: () => void; err
       <div className="card center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/icons/icon-192.png" alt="" />
-        <h1>GE Alerter</h1>
-        <p className="muted">{message ?? 'Desktop notifications from your Gemini Enterprise agents and workflows.'}</p>
+        <h1>Agent Notifications</h1>
+        <p className="muted">{message ?? 'Notifications from your Gemini Enterprise agents and workflows.'}</p>
         {isConfigured ? (
           <p>
             <button className="primary" type="button" onClick={onSignIn}>

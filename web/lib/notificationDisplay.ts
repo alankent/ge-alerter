@@ -44,5 +44,5 @@ export function buildNotificationOptions(data: PushData): RichNotificationOption
 export async function showLocalNotification(data: PushData): Promise<void> {
   if (!('serviceWorker' in navigator)) return;
   const reg = await navigator.serviceWorker.ready;
-  await reg.showNotification(data.title || 'Gemini Enterprise', buildNotificationOptions(data));
+  await reg.showNotification(data.title || 'Agent Notifications', buildNotificationOptions(data));
 }

@@ -1,6 +1,6 @@
 /* eslint-disable no-undef */
 /**
- * Service worker for GE Alerter.
+ * Service worker for Agent Notifications.
  *
  * Receives data-only Firebase Cloud Messaging pushes and shows a desktop
  * notification with action buttons. The Firebase config is passed in the
@@ -48,7 +48,7 @@ if (firebaseConfig.projectId) {
   const messaging = firebase.messaging();
   messaging.onBackgroundMessage((payload) => {
     const data = payload.data || {};
-    return self.registration.showNotification(data.title || 'Gemini Enterprise', buildNotificationOptions(data));
+    return self.registration.showNotification(data.title || 'Agent Notifications', buildNotificationOptions(data));
   });
 }
 

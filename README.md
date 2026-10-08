@@ -1,6 +1,9 @@
-# GE Alerter
+# Agent Notifications
 
-Desktop notifications from **Gemini Enterprise** agents and workflows.
+Notifications from **Gemini Enterprise** agents and workflows, on your desktop, phone and tablet.
+
+The repository, Cloud Run service, hosting site and other resource ids keep the original name `ge-alerter`; only the
+name people see changed.
 
 A scheduled agent or workflow finishes, calls one MCP tool, and a notification with action buttons pops up on your desktop
 through Chrome. Click it to jump straight to the Gemini Enterprise conversation. Everything runs on Firebase and Cloud Run and
@@ -16,8 +19,8 @@ costs nothing while nothing is happening.
                                                                         live DB listener  +  Web Push
                                                                                               ▼
                                                                                    ┌──────────────────────┐
-                                                                                   │ GE Alerter PWA       │
-                                                                                   │ (Chrome, installed)  │
+                                                                                   │ Agent Notifications  │
+                                                                                   │ PWA (installed)      │
                                                                                    │ inbox + desktop      │
                                                                                    │ notifications        │
                                                                                    └──────────────────────┘

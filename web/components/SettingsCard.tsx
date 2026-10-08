@@ -35,7 +35,7 @@ export function SettingsCard({ uid }: { uid: string }) {
       <h2>Default link</h2>
       <p className="muted small">
         Opened when you click a notification that has no link of its own. Point it at your Gemini Enterprise app or inbox so one click takes you to the
-        conversation that produced the alert.
+        conversation that produced the notification.
       </p>
       <div className="row">
         <input className="grow" type="url" placeholder="https://geminienterprise.google.com/..." value={defaultUrl} onChange={(e) => setDefaultUrl(e.target.value)} />

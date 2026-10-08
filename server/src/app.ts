@@ -48,7 +48,7 @@ export function createApp({ config, store, pusher, identity }: AppDeps) {
   });
 
   app.get('/', (_req, res) => {
-    res.type('text').send(`ge-alerter MCP server\n\nMCP endpoint: ${config.publicUrl}/mcp\nApp: ${config.webUrl}\n`);
+    res.type('text').send(`Agent Notifications MCP server (ge-alerter)\n\nMCP endpoint: ${config.publicUrl}/mcp\nApp: ${config.webUrl}\n`);
   });
 
   app.use(createOAuthRouter({ config, store, identity }));
@@ -126,8 +126,8 @@ export function createApp({ config, store, pusher, identity }: AppDeps) {
         [device.token],
         {
           id: `test-${now}`,
-          title: 'GE Alerter is working',
-          body: 'This is a test. Alerts from your agents and workflows will appear like this.',
+          title: 'Notifications are working',
+          body: 'This is a test. Notifications from your agents and workflows will appear like this.',
           url: config.webUrl,
           actions: '[]',
           tags: '[]',

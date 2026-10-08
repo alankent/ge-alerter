@@ -19,7 +19,7 @@ export function Dashboard({ user, onSignOut }: { user: User; onSignOut: () => vo
       <header className="top">
         <h1>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icons/icon-192.png" alt="" /> GE Alerter <span className="status">Advanced</span>
+          <img src="/icons/icon-192.png" alt="" /> Agent Notifications <span className="status">Advanced</span>
         </h1>
         <span className="who">
           {/* eslint-disable-next-line @next/next/no-img-element */}

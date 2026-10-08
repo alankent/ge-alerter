@@ -44,7 +44,7 @@ export function Setup() {
           <span aria-hidden="true">·</span>
         </>
       )}
-      <a href="/advanced">Alert history and advanced settings</a>
+      <a href="/advanced">Notification history and advanced settings</a>
     </footer>
   );
 
@@ -81,8 +81,8 @@ function Shell({ children, footer }: { children: ReactNode; footer?: ReactNode }
       <div className="hero">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/icons/icon-192.png" alt="" />
-        <h1>GE Alerter</h1>
-        <p className="muted">Alerts from your Gemini Enterprise agents and workflows, on this device.</p>
+        <h1>Agent Notifications</h1>
+        <p className="muted">Notifications from your Gemini Enterprise agents and workflows, on this device.</p>
       </div>
       <div className="card setup-card">{children}</div>
       {footer}
@@ -157,7 +157,7 @@ function NotificationsStep({ user, platform }: { user: User | null; platform: Pl
       ) : support === 'denied' ? (
         <p className="error">
           {platform.ios
-            ? 'Notifications are turned off for GE Alerter. Open Settings, then Notifications, then GE Alerter, and allow them.'
+            ? 'Notifications are turned off for this app. Open Settings, then Notifications, then Agents, and allow them.'
             : 'Notifications are blocked for this site. Click the icon at the left of the address bar, set Notifications to Allow, then reload this page.'}
         </p>
       ) : on ? (
@@ -204,7 +204,7 @@ function InstallStep({ platform }: { platform: Platform }) {
   }
   return (
     <Step n={3} title="Install the app" optional>
-      <p className="muted">Gives GE Alerter its own window, so your alerts are one click away.</p>
+      <p className="muted">Gives Agent Notifications its own window, so your notifications are one click away.</p>
       {canInstall ? (
         <button className="primary" type="button" onClick={() => void install()}>
           Install app
@@ -214,7 +214,7 @@ function InstallStep({ platform }: { platform: Platform }) {
       ) : platform.browser === 'safari' ? (
         <p className="small">In Safari, choose File, then Add to Dock.</p>
       ) : (
-        <p className="small">This browser can’t install apps. Alerts still arrive while it’s running.</p>
+        <p className="small">This browser can’t install apps. Notifications still arrive while it’s running.</p>
       )}
     </Step>
   );
@@ -242,8 +242,8 @@ function IosInstall({ otherBrowser }: { otherBrowser: boolean }) {
   const [copied, setCopied] = useState(false);
   return (
     <>
-      <h2 className="setup-title">Add GE Alerter to your Home Screen</h2>
-      <p className="muted">On iPhone and iPad, alerts only arrive in the Home Screen app. It takes a few taps.</p>
+      <h2 className="setup-title">Add Agent Notifications to your Home Screen</h2>
+      <p className="muted">On iPhone and iPad, notifications only arrive in the Home Screen app. It takes a few taps.</p>
       {otherBrowser && (
         <div className="callout">
           <p>
@@ -270,7 +270,7 @@ function IosInstall({ otherBrowser }: { otherBrowser: boolean }) {
             Scroll down the menu and tap <AddIcon /> <strong>Add to Home Screen</strong>, then <strong>Add</strong>.
           </p>
         </Step>
-        <Step n={3} title="Open GE Alerter from your Home Screen">
+        <Step n={3} title="Open Agents from your Home Screen">
           <p className="muted">Sign in there and tap Turn on notifications. You can close this Safari tab.</p>
         </Step>
       </ol>

@@ -73,7 +73,7 @@ function Connect() {
         ) : (
           <>
             <p className="muted">
-              Agents and workflows running as <strong>{user.email}</strong> will be able to send desktop notifications and read your alert inbox.
+              Agents and workflows running as <strong>{user.email}</strong> will be able to send you notifications and read your notification history.
             </p>
             <p className="row" style={{ justifyContent: 'center' }}>
               <button className="primary" type="button" disabled={busy || !info} onClick={() => decide(true)}>
@@ -84,7 +84,7 @@ function Connect() {
               </button>
             </p>
             <p className="callout small">
-              Alerts pop up only on devices where you’ve turned on notifications.{' '}
+              Notifications pop up only on devices where you’ve turned them on.{' '}
               <a href="/" target="_blank" rel="noopener">
                 Set up this device
               </a>{' '}
