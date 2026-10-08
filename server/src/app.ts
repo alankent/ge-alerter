@@ -1,12 +1,13 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { allowedDomainsText, isAllowedUser } from './access.js';
 import { bearerAuth, userIdFrom, type AuthedRequest } from './bearer.js';
 import type { Config } from './config.js';
 import { ackToken, safeEqual } from './crypto.js';
 import { createMcpServer } from './mcp.js';
 import { Notifier, notificationInputSchema } from './notify.js';
 import { createOAuthRouter } from './oauth.js';
-import type { Identity, Pusher, Store } from './store/types.js';
+import type { Identity, Pusher, Store, VerifiedUser } from './store/types.js';
 
 export interface AppDeps {
   config: Config;
@@ -54,7 +55,7 @@ export function createApp({ config, store, pusher, identity }: AppDeps) {
 
   /** Stateless Streamable HTTP: new server + transport per request. */
   app.post('/mcp', requireBearer, async (req: AuthedRequest, res) => {
-    const server = createMcpServer(notifier, store);
+    const server = createMcpServer(notifier, store, config.webUrl);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
@@ -93,6 +94,55 @@ export function createApp({ config, store, pusher, identity }: AppDeps) {
       }
       const outcome = await notifier.send(userIdFrom(req.auth), parsed.data, 'api', req.auth?.clientId);
       res.status(201).json({ id: outcome.notification.id, delivered: outcome.delivered, devices: outcome.devices });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  /**
+   * "Send test" in the PWA: pushes a test alert to one of the signed-in user's own devices, through FCM like a
+   * real alert, so it proves the whole path. Not stored in the inbox. Authenticated with the PWA's Firebase ID token.
+   */
+  app.post('/api/test-push', async (req, res, next) => {
+    try {
+      const header = req.headers.authorization ?? '';
+      if (!header.toLowerCase().startsWith('bearer ')) return res.status(401).json({ error: 'unauthorized' });
+      let user: VerifiedUser;
+      try {
+        user = await identity.verifyIdToken(header.slice(7).trim());
+      } catch {
+        return res.status(401).json({ error: 'unauthorized' });
+      }
+      if (!isAllowedUser(user, config.allowedEmailDomains)) {
+        return res.status(403).json({ error: 'forbidden', error_description: `Only ${allowedDomainsText(config.allowedEmailDomains)} accounts can use this app.` });
+      }
+      const key = typeof req.body?.device === 'string' ? req.body.device : '';
+      const device = (await store.listDevices(user.uid)).find((d) => d.key === key);
+      if (!device) {
+        return res.status(404).json({ error: 'not_found', error_description: 'Notifications are not turned on for this device.' });
+      }
+      const now = Date.now();
+      const result = await pusher.send(
+        [device.token],
+        {
+          id: `test-${now}`,
+          title: 'GE Alerter is working',
+          body: 'This is a test. Alerts from your agents and workflows will appear like this.',
+          url: config.webUrl,
+          actions: '[]',
+          tags: '[]',
+          createdAt: String(now),
+          priority: 'high',
+          ackUrl: '',
+          inboxUrl: config.webUrl,
+        },
+        'high',
+      );
+      if (result.invalidTokens.includes(device.token)) {
+        await store.removeDevice(user.uid, device.key);
+        return res.status(410).json({ error: 'gone', error_description: 'This device stopped accepting notifications. Turn them on again.' });
+      }
+      res.json({ delivered: result.successCount });
     } catch (err) {
       next(err);
     }

@@ -1,21 +1,20 @@
 'use client';
 
-import { Suspense } from 'react';
-import { Dashboard } from '@/components/Dashboard';
-import { SignIn } from '@/components/SignIn';
-import { useAuth } from '@/lib/useAuth';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect } from 'react';
+import { Setup } from '@/components/Setup';
 
 function Home() {
-  const { user, loading, error, signIn, signOut } = useAuth();
-  if (loading) {
-    return (
-      <main>
-        <p className="muted center">Loading…</p>
-      </main>
-    );
-  }
-  if (!user) return <SignIn onSignIn={signIn} error={error} />;
-  return <Dashboard user={user} onSignOut={signOut} />;
+  const params = useSearchParams();
+  const router = useRouter();
+  const highlight = params.get('n');
+
+  // Clicking an alert that has no link of its own opens /?n=<id>; show it in the alert history.
+  useEffect(() => {
+    if (highlight) router.replace(`/advanced?n=${encodeURIComponent(highlight)}`);
+  }, [highlight, router]);
+
+  return highlight ? null : <Setup />;
 }
 
 export default function Page() {

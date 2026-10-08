@@ -10,12 +10,13 @@ export const SERVER_INFO = { name: 'ge-alerter', version: '0.1.0' };
  * Builds the MCP server that Gemini Enterprise talks to. A fresh instance is
  * created per HTTP request (stateless Streamable HTTP), so this must be cheap.
  */
-export function createMcpServer(notifier: Notifier, store: Store): McpServer {
+export function createMcpServer(notifier: Notifier, store: Store, setupUrl: string): McpServer {
   const server = new McpServer(SERVER_INFO, {
     instructions:
       'Use send_notification to alert the user on their desktop when a scheduled agent or workflow finishes, ' +
       'needs attention, or finds something worth reporting. Keep titles short and put details in body or data. ' +
-      'Include a url to the conversation or result when you have one.',
+      'Include a url to the conversation or result when you have one. ' +
+      `If the user asks how to get these alerts on a device, send them to ${setupUrl}`,
   });
 
   server.registerTool(
@@ -38,8 +39,12 @@ export function createMcpServer(notifier: Notifier, store: Store): McpServer {
       const outcome = await notifier.send(uid, args, 'mcp', extra.authInfo?.clientId);
       const summary =
         outcome.devices === 0
-          ? `Notification saved to the inbox, but the user has no devices registered for push. Ask them to enable notifications in the GE Alerter app.`
-          : `Notification sent to ${outcome.delivered} of ${outcome.devices} device(s) and saved to the inbox.`;
+          ? `Notification saved to the inbox, but the user has not turned on notifications on any device, so nothing popped up. ` +
+            `Tell the user to open ${setupUrl} on each computer, phone or tablet where they want alerts and follow the steps there.`
+          : outcome.delivered === 0
+            ? `Notification saved to the inbox, but none of the user's ${outcome.devices} device(s) accepted it. ` +
+              `Suggest they open ${setupUrl} and use Send test to check their setup.`
+            : `Notification sent to ${outcome.delivered} of ${outcome.devices} device(s) and saved to the inbox.`;
       return {
         content: [{ type: 'text', text: summary }],
         structuredContent: { id: outcome.notification.id, delivered: outcome.delivered, devices: outcome.devices },

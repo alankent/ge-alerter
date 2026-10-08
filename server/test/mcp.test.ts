@@ -92,6 +92,15 @@ describe('MCP endpoint', () => {
     await client.close();
   });
 
+  it('tells the agent where to send the user when no device has notifications on', async () => {
+    const client = await connect();
+    const result = await client.callTool({ name: 'send_notification', arguments: { title: 'Nobody listening' } });
+    const text = (result.content as { type: string; text: string }[])[0].text;
+    expect(text).toContain(ctx.config.webUrl);
+    expect(text).toContain('not turned on notifications');
+    await client.close();
+  });
+
   it('validates tool input', async () => {
     const client = await connect();
     const result = await client.callTool({ name: 'send_notification', arguments: { title: '', url: 'ftp://nope' } });
@@ -138,5 +147,49 @@ describe('REST endpoint', () => {
       body: JSON.stringify({ body: 'no title' }),
     });
     expect(bad.status).toBe(400);
+  });
+});
+
+describe('test push from the PWA', () => {
+  it('pushes only to the caller\'s own device and needs a Firebase ID token', async () => {
+    const { ID_TOKEN, OUTSIDER_ID_TOKEN } = await import('./helpers.js');
+    ctx.store.devices.set('alice-uid', [
+      { key: 'd1', token: 'tok-1' },
+      { key: 'd2', token: 'tok-2' },
+    ]);
+    const post = (token: string | null, device: string) =>
+      fetch(new URL('/api/test-push', ctx.baseUrl), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ device }),
+      });
+
+    expect((await post(null, 'd1')).status).toBe(401);
+    expect((await post('not-a-token', 'd1')).status).toBe(401);
+    expect((await post(OUTSIDER_ID_TOKEN, 'd1')).status).toBe(404); // Mallory has no such device.
+    expect((await post(ID_TOKEN, 'nope')).status).toBe(404);
+
+    const ok = await post(ID_TOKEN, 'd2');
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toEqual({ delivered: 1 });
+    expect(ctx.pusher.sent).toHaveLength(1);
+    expect(ctx.pusher.sent[0].tokens).toEqual(['tok-2']);
+    expect(ctx.store.notifications.get('alice-uid') ?? []).toHaveLength(0); // not stored in the inbox
+
+    ctx.pusher.invalid.add('tok-2');
+    expect((await post(ID_TOKEN, 'd2')).status).toBe(410);
+    expect(ctx.store.devices.get('alice-uid')?.map((d) => d.key)).toEqual(['d1']);
+  });
+
+  it('refuses accounts outside the allowed domains', async () => {
+    await ctx.close();
+    ctx = await startTestServer({ allowedEmailDomains: ['example.com'] });
+    const { OUTSIDER_ID_TOKEN } = await import('./helpers.js');
+    const r = await fetch(new URL('/api/test-push', ctx.baseUrl), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${OUTSIDER_ID_TOKEN}` },
+      body: JSON.stringify({ device: 'd1' }),
+    });
+    expect(r.status).toBe(403);
   });
 });

@@ -83,6 +83,13 @@ function Connect() {
                 Deny
               </button>
             </p>
+            <p className="callout small">
+              Alerts pop up only on devices where you’ve turned on notifications.{' '}
+              <a href="/" target="_blank" rel="noopener">
+                Set up this device
+              </a>{' '}
+              in a new tab, then come back here and click Allow.
+            </p>
           </>
         )}
       </div>

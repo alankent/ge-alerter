@@ -2,7 +2,8 @@
 
 import { deleteToken, getToken, onMessage, type Messaging } from 'firebase/messaging';
 import { ref, remove, set } from 'firebase/database';
-import { db, firebaseConfig, messaging, VAPID_KEY } from './firebase';
+import type { User } from 'firebase/auth';
+import { API_URL, db, firebaseConfig, messaging, VAPID_KEY } from './firebase';
 import { showLocalNotification, type PushData } from './notificationDisplay';
 
 const DEVICE_KEY_STORAGE = 'ge-alerter:deviceKey';
@@ -89,6 +90,19 @@ export async function disablePush(uid: string): Promise<void> {
     }
   }
   await remove(ref(db(), `users/${uid}/devices/${deviceKey()}`));
+}
+
+/** Asks the server to push a test alert to this device through FCM, exactly like a real alert. */
+export async function sendTestPush(user: User): Promise<void> {
+  const r = await fetch(`${API_URL}/api/test-push`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${await user.getIdToken()}` },
+    body: JSON.stringify({ device: deviceKey() }),
+  });
+  if (!r.ok) {
+    const body = (await r.json().catch(() => ({}))) as { error_description?: string };
+    throw new Error(body.error_description ?? `The test could not be sent (HTTP ${r.status}).`);
+  }
 }
 
 /**

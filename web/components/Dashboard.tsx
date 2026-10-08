@@ -1,9 +1,8 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useEffect } from 'react';
 import type { User } from 'firebase/auth';
-import { listenForeground, registerServiceWorker } from '@/lib/push';
+import { useForegroundPush } from '@/lib/useForegroundPush';
 import { ConnectCard } from './ConnectCard';
 import { NotificationList } from './NotificationList';
 import { PushCard } from './PushCard';
@@ -13,25 +12,14 @@ export function Dashboard({ user, onSignOut }: { user: User; onSignOut: () => vo
   const params = useSearchParams();
   const highlightId = params.get('n');
 
-  useEffect(() => {
-    if (!('serviceWorker' in navigator)) return;
-    let stop: (() => void) | undefined;
-    // Make sure the worker is current, then listen for pushes while focused.
-    registerServiceWorker()
-      .then(() => listenForeground())
-      .then((unsubscribe) => {
-        stop = unsubscribe;
-      })
-      .catch(() => undefined);
-    return () => stop?.();
-  }, []);
+  useForegroundPush();
 
   return (
     <main>
       <header className="top">
         <h1>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icons/icon-192.png" alt="" /> GE Alerter
+          <img src="/icons/icon-192.png" alt="" /> GE Alerter <span className="status">Advanced</span>
         </h1>
         <span className="who">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -46,6 +34,9 @@ export function Dashboard({ user, onSignOut }: { user: User; onSignOut: () => vo
       <PushCard uid={user.uid} />
       <SettingsCard uid={user.uid} />
       <ConnectCard />
+      <p className="muted small center-text">
+        <a href="/">Back to setup</a>
+      </p>
     </main>
   );
 }
