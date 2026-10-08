@@ -3,7 +3,7 @@
 import { onValue, ref, remove } from 'firebase/database';
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/firebase';
-import { deviceKey, disablePush, enablePush, pushSupport, type PushSupport } from '@/lib/push';
+import { deviceKey, disablePush, enablePush, needsHomeScreenInstall, pushSupport, type PushSupport } from '@/lib/push';
 import { showLocalNotification } from '@/lib/notificationDisplay';
 import type { Device } from '@/lib/types';
 
@@ -13,9 +13,11 @@ export function PushCard({ uid }: { uid: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [thisKey, setThisKey] = useState('');
+  const [needsInstall, setNeedsInstall] = useState(false);
 
   useEffect(() => {
     setSupport(pushSupport());
+    setNeedsInstall(needsHomeScreenInstall());
     setThisKey(deviceKey());
     return onValue(ref(db(), `users/${uid}/devices`), (snap) => {
       const list: Device[] = [];
@@ -43,8 +45,16 @@ export function PushCard({ uid }: { uid: string }) {
 
   return (
     <div className="card">
-      <h2>Desktop notifications</h2>
-      {support === 'unsupported' && <p className="error">This browser does not support Web Push. Use Chrome, Edge or Firefox on a desktop.</p>}
+      <h2>Notifications</h2>
+      {support === 'unsupported' && needsInstall && (
+        <p className="error">
+          On iPhone and iPad, notifications only work from the Home Screen. In Safari tap Share, then Add to Home Screen, open the app from
+          its icon, sign in and enable notifications there.
+        </p>
+      )}
+      {support === 'unsupported' && !needsInstall && (
+        <p className="error">This browser does not support Web Push. Use Chrome, Edge or Firefox on a desktop, or the Home Screen app on iPhone and iPad.</p>
+      )}
       {support === 'denied' && (
         <p className="error">Notifications are blocked for this site. Allow them in the browser&apos;s site settings, then reload.</p>
       )}
@@ -67,7 +77,8 @@ export function PushCard({ uid }: { uid: string }) {
       </div>
       {error && <p className="error small">{error}</p>}
       <p className="muted small">
-        Notifications arrive while Chrome is running, even with this tab closed. Install the app from the address bar for a window of its own.
+        On a desktop, notifications arrive while the browser is running, even with this tab closed; install the app from the address bar for
+        a window of its own. On iPhone and iPad, add the app to the Home Screen from Safari.
       </p>
       {devices.length > 0 && (
         <details>

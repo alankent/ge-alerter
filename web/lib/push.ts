@@ -24,6 +24,17 @@ export function deviceKey(): string {
 
 export type PushSupport = 'unsupported' | 'denied' | 'default' | 'granted';
 
+/**
+ * True on an iPhone or iPad that is showing the site in a browser tab. Apple only grants Web Push to web apps
+ * added to the Home Screen from Safari, so the fix is to install, not to switch browsers.
+ */
+export function needsHomeScreenInstall(): boolean {
+  if (typeof window === 'undefined') return false;
+  const apple = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true;
+  return apple && !standalone;
+}
+
 export function pushSupport(): PushSupport {
   if (typeof window === 'undefined') return 'unsupported';
   if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) return 'unsupported';
@@ -41,7 +52,9 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
 function browserLabel(): string {
   const ua = navigator.userAgent;
   const browser = /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'Browser';
-  const os = /Windows/.test(ua) ? 'Windows' : /Mac OS/.test(ua) ? 'macOS' : /CrOS/.test(ua) ? 'ChromeOS' : /Linux/.test(ua) ? 'Linux' : /Android/.test(ua) ? 'Android' : '';
+  // iPads report a Mac user agent; the touch screen tells them apart.
+  const apple = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const os = apple ? 'iPadOS/iOS' : /Windows/.test(ua) ? 'Windows' : /Mac OS/.test(ua) ? 'macOS' : /CrOS/.test(ua) ? 'ChromeOS' : /Linux/.test(ua) ? 'Linux' : /Android/.test(ua) ? 'Android' : '';
   return [browser, os].filter(Boolean).join(' on ');
 }
 
