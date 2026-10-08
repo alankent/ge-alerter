@@ -26,11 +26,15 @@ export interface Config {
    * Email domains allowed to connect, lower case, e.g. ["imdigital.com"]. Empty allows any verified Google account.
    */
   allowedEmailDomains: string[];
+  /** Hosts (optionally with a path prefix) that notification links may point to; see links.ts. Empty allows any. */
+  allowedLinks: string[];
   /** Which backing store to use. */
   store: 'firebase' | 'memory';
   firebaseDatabaseUrl?: string;
   firebaseProjectId?: string;
 }
+
+import { parseAllowedLinks } from './links.js';
 
 export const GEMINI_ENTERPRISE_REDIRECT_URI = 'https://vertexaisearch.cloud.google.com/oauth-redirect';
 
@@ -86,6 +90,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       .split(',')
       .map((d) => d.trim().toLowerCase().replace(/^@/, ''))
       .filter(Boolean),
+    allowedLinks: parseAllowedLinks(env.ALLOWED_LINKS),
     store,
     firebaseDatabaseUrl: env.FIREBASE_DATABASE_URL,
     firebaseProjectId: env.FIREBASE_PROJECT_ID ?? env.GOOGLE_CLOUD_PROJECT,

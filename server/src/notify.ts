@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { Config } from './config.js';
 import { ackToken } from './crypto.js';
 import type { NotificationInput, NotificationRecord, Pusher, Store } from './store/types.js';
+import { isAllowedLink } from './links.js';
 
 const httpUrl = z
   .string()
@@ -42,6 +43,8 @@ export interface SendOutcome {
   notification: NotificationRecord;
   delivered: number;
   devices: number;
+  /** Links the agent supplied that are not on the allow-list and were dropped. */
+  removedLinks: string[];
 }
 
 export class Notifier {
@@ -57,9 +60,19 @@ export class Notifier {
 
   async send(uid: string, input: NotificationInput, source: string, clientId?: string): Promise<SendOutcome> {
     const settings = await this.store.getUserSettings(uid);
+    // Only agent-supplied links are checked; the user's own default link is theirs to choose.
+    const removedLinks: string[] = [];
+    const allowed = (link: string) => {
+      const ok = isAllowedLink(link, this.config.allowedLinks, this.config.webUrl);
+      if (!ok) removedLinks.push(link);
+      return ok;
+    };
+    const url = input.url && allowed(input.url) ? input.url : undefined;
+    const actions = input.actions?.filter((a) => allowed(a.url));
     const record: Omit<NotificationRecord, 'id'> = {
       ...input,
-      url: input.url ?? settings.defaultUrl,
+      ...(input.actions ? { actions } : {}),
+      url: url ?? settings.defaultUrl,
       createdAt: Date.now(),
       read: false,
       source,
@@ -94,6 +107,6 @@ export class Notifier {
         if (device) await this.store.removeDevice(uid, device.key);
       }
     }
-    return { notification, delivered, devices: devices.length };
+    return { notification, delivered, devices: devices.length, removedLinks };
   }
 }

@@ -93,7 +93,7 @@ export function createApp({ config, store, pusher, identity }: AppDeps) {
         return res.status(400).json({ error: 'invalid_request', issues: parsed.error.issues });
       }
       const outcome = await notifier.send(userIdFrom(req.auth), parsed.data, 'api', req.auth?.clientId);
-      res.status(201).json({ id: outcome.notification.id, delivered: outcome.delivered, devices: outcome.devices });
+      res.status(201).json({ id: outcome.notification.id, delivered: outcome.delivered, devices: outcome.devices, removedLinks: outcome.removedLinks });
     } catch (err) {
       next(err);
     }

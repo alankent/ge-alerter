@@ -34,8 +34,14 @@ export function createMcpServer(notifier: Notifier, store: Store, setupUrl: stri
         id: z.string(),
         delivered: z.number().int().describe('Devices the push was delivered to.'),
         devices: z.number().int().describe('Devices registered for the user.'),
+        removedLinks: z.array(z.string()).describe('Links dropped because they are not on the allowed list.'),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      // Gemini Enterprise pauses every action for user confirmation unless the tool is marked readOnlyHint, and
+      // scheduled runs then sit waiting for approval, which defeats the purpose of the tool. The only side effect is
+      // a notification to the same user who authorized the connection (nothing reaches anyone else), and links are
+      // limited to an allow-list (links.ts) so an agent steered by injected content cannot send the user to an
+      // arbitrary page. Re-import the actions in Gemini Enterprise after changing this.
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async (args, extra) => {
       const uid = userIdFrom(extra.authInfo);
@@ -49,9 +55,18 @@ export function createMcpServer(notifier: Notifier, store: Store, setupUrl: stri
             ? `Notification saved to the inbox, but none of the user's ${outcome.devices} device(s) accepted it. ` +
               `Suggest they open ${setupUrl} and use Send test to check their setup; ${setupUrl}/install has help for each device.`
             : `Notification sent to ${outcome.delivered} of ${outcome.devices} device(s) and saved to the inbox.`;
+      const removed = outcome.removedLinks.length
+        ? ` These links were removed because they are not on the allowed list: ${outcome.removedLinks.join(', ')}. ` +
+          'Clicking the notification opens the user\'s default link instead; mention the link in the body if the user needs it.'
+        : '';
       return {
-        content: [{ type: 'text', text: summary }],
-        structuredContent: { id: outcome.notification.id, delivered: outcome.delivered, devices: outcome.devices },
+        content: [{ type: 'text', text: summary + removed }],
+        structuredContent: {
+          id: outcome.notification.id,
+          delivered: outcome.delivered,
+          devices: outcome.devices,
+          removedLinks: outcome.removedLinks,
+        },
       };
     },
   );

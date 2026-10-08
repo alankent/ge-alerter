@@ -38,6 +38,10 @@ describe('MCP endpoint', () => {
     expect(tools.map((t) => t.name).sort()).toEqual(['get_setup_instructions', 'list_notifications', 'mark_notification_read', 'send_notification']);
     const send = tools.find((t) => t.name === 'send_notification');
     expect(send?.inputSchema.required).toEqual(['title']);
+    // Gemini Enterprise only runs a tool without asking for confirmation when it is marked read-only;
+    // scheduled agents must be able to notify unattended.
+    expect(send?.annotations?.readOnlyHint).toBe(true);
+    expect(send?.annotations?.destructiveHint).toBe(false);
     await client.close();
   });
 
@@ -89,6 +93,55 @@ describe('MCP endpoint', () => {
     // A tampered link is refused.
     const tampered = await fetch(push.data.ackUrl.replace(/token=.*$/, 'token=bad'), { method: 'POST' });
     expect(tampered.status).toBe(403);
+    await client.close();
+  });
+
+  it('drops links that are not on the allow-list but still delivers the notification', async () => {
+    await ctx.close();
+    ctx = await startTestServer({ allowedLinks: ['vertexaisearch.cloud.google.com/home/cid/abc/', '*.imdigital.com'] });
+    accessToken = (await obtainTokens(ctx)).body.access_token as string;
+    ctx.store.devices.set('alice-uid', [{ key: 'd1', token: 'tok-1' }]);
+    ctx.store.settings.set('alice-uid', { defaultUrl: 'https://vertexaisearch.cloud.google.com/home/cid/abc/r/inbox' });
+    const client = await connect();
+
+    const ok = await client.callTool({
+      name: 'send_notification',
+      arguments: {
+        title: 'Allowed',
+        url: 'https://ge.imdigital.com/run/1',
+        actions: [
+          { title: 'Inbox', url: 'https://vertexaisearch.cloud.google.com/home/cid/abc/r/inbox' },
+          { title: 'Company', url: 'https://imdigital.com/x' },
+        ],
+      },
+    });
+    expect((ok.structuredContent as { removedLinks: string[] }).removedLinks).toEqual([]);
+    expect(ctx.store.notifications.get('alice-uid')?.[0].url).toBe('https://ge.imdigital.com/run/1');
+    expect(ctx.store.notifications.get('alice-uid')?.[0].actions).toHaveLength(2);
+
+    const bad = await client.callTool({
+      name: 'send_notification',
+      arguments: {
+        title: 'Suspicious',
+        url: 'https://imdigital.com.evil.example/login',
+        actions: [
+          { title: 'Other tenant', url: 'https://vertexaisearch.cloud.google.com/home/cid/zzz/' },
+          { title: 'Fine', url: 'https://ge.imdigital.com/ok' },
+        ],
+      },
+    });
+    expect(bad.isError).toBeFalsy();
+    const out = bad.structuredContent as { delivered: number; removedLinks: string[] };
+    expect(out.delivered).toBe(1);
+    expect(out.removedLinks).toEqual([
+      'https://imdigital.com.evil.example/login',
+      'https://vertexaisearch.cloud.google.com/home/cid/zzz/',
+    ]);
+    expect((bad.content as { text: string }[])[0].text).toContain('not on the allowed list');
+    const stored = ctx.store.notifications.get('alice-uid')?.find((n) => n.title === 'Suspicious');
+    expect(stored?.url).toBe('https://vertexaisearch.cloud.google.com/home/cid/abc/r/inbox'); // fell back to the default link
+    expect(stored?.actions).toEqual([{ title: 'Fine', url: 'https://ge.imdigital.com/ok' }]);
+    expect(ctx.pusher.sent.at(-1)?.data.url).toBe('https://vertexaisearch.cloud.google.com/home/cid/abc/r/inbox');
     await client.close();
   });
 

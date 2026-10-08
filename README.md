@@ -159,6 +159,20 @@ Either way the tools `send_notification`, `list_notifications` and `mark_notific
 
 ### 5. Use it from an agent or workflow
 
+Gemini Enterprise asks the user to confirm every action unless the tool is annotated `readOnlyHint`, and a scheduled
+run would then wait for an approval nobody gives. `send_notification` is therefore annotated read-only: its only effect
+is a notification to the user who authorized the connection. Gemini Enterprise reads annotations when it imports the
+actions, so after upgrading the server, remove and re-add (or re-import) the connector's actions.
+
+Because nobody confirms the call, the server only lets notification links (the click-through `url` and action
+buttons) point to an allow-list, so an agent tricked by content it is reading cannot send you to an arbitrary page.
+The default list is the Gemini Enterprise web app (`vertexaisearch.cloud.google.com`) and `*.imdigital.com`; the app
+itself is always allowed. Other links are dropped (the notification still arrives and opens your default link), and
+the tool result tells the agent which. To change the list, re-run the bootstrap with, for example,
+`ONLY=server ALLOWED_LINKS="vertexaisearch.cloud.google.com,*.imdigital.com,docs.google.com" ./scripts/bootstrap.sh`.
+Entries can carry a path prefix, such as `vertexaisearch.cloud.google.com/home/cid/<your app id>/`, to allow only your
+own Gemini Enterprise app.
+
 Add the MCP data store to your Gemini Enterprise app, then in **Agent Designer** or **Workflow Builder** give the agent
 access to the tool and tell it when to call it. Example instruction for a scheduled agent:
 
