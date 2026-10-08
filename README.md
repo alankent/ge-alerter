@@ -43,6 +43,7 @@ costs nothing while nothing is happening.
 | `send_notification` | `title`, optional `body`, `url`, up to two `actions` (`{title, url}`), `priority`, `tags`, `data`. Stores the alert in the user's inbox and pushes it to every registered browser. |
 | `list_notifications` | Recent inbox entries, optionally unread only. Lets an agent avoid repeating itself. |
 | `mark_notification_read` | Marks an entry read. |
+| `get_setup_instructions` | Optional `platform` (`ios`, `windows`, `mac`, `android`, `other`). Returns the setup page and the per-device instructions page (`/install`) with steps the agent can relay, so an agent can tell a user how to start receiving notifications. Read-only, so Gemini Enterprise runs it without asking for confirmation. |
 
 Each notification shows the agent's buttons (or a default **Mark done**), opens its `url` on click, and falls back to the
 **Default link** you set in the app (point it at your Gemini Enterprise inbox) when the agent sends none.

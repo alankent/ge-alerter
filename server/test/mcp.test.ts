@@ -35,7 +35,7 @@ describe('MCP endpoint', () => {
   it('lists the notification tools', async () => {
     const client = await connect();
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(['list_notifications', 'mark_notification_read', 'send_notification']);
+    expect(tools.map((t) => t.name).sort()).toEqual(['get_setup_instructions', 'list_notifications', 'mark_notification_read', 'send_notification']);
     const send = tools.find((t) => t.name === 'send_notification');
     expect(send?.inputSchema.required).toEqual(['title']);
     await client.close();
@@ -98,6 +98,28 @@ describe('MCP endpoint', () => {
     const text = (result.content as { type: string; text: string }[])[0].text;
     expect(text).toContain(ctx.config.webUrl);
     expect(text).toContain('not turned on notifications');
+    await client.close();
+  });
+
+  it('get_setup_instructions returns per-platform steps without confirmation', async () => {
+    const client = await connect();
+    const { tools } = await client.listTools();
+    expect(tools.find((t) => t.name === 'get_setup_instructions')?.annotations?.readOnlyHint).toBe(true);
+
+    const ios = await client.callTool({ name: 'get_setup_instructions', arguments: { platform: 'ios' } });
+    const iosText = (ios.content as { text: string }[])[0].text;
+    expect(iosText).toContain(`${ctx.config.webUrl}/install`);
+    expect(iosText).toContain('Safari');
+    expect(iosText).toContain('Add to Home Screen');
+    expect(iosText).not.toContain('Windows Settings');
+    expect(ios.structuredContent).toEqual({ setupUrl: ctx.config.webUrl, instructionsUrl: `${ctx.config.webUrl}/install` });
+
+    const all = await client.callTool({ name: 'get_setup_instructions', arguments: {} });
+    const allText = (all.content as { text: string }[])[0].text;
+    for (const label of ['iPhone and iPad:', 'Windows:', 'Mac:', 'Android:']) expect(allText).toContain(label);
+
+    const bad = await client.callTool({ name: 'get_setup_instructions', arguments: { platform: 'amiga' } });
+    expect(bad.isError).toBe(true);
     await client.close();
   });
 

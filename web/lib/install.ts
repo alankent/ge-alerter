@@ -32,6 +32,7 @@ export interface Platform {
   /** On iOS, a browser other than Safari (Chrome, Firefox, Edge, the Google app...). */
   iosOtherBrowser: boolean;
   browser: 'chrome' | 'edge' | 'firefox' | 'safari' | 'other';
+  os: 'ios' | 'android' | 'windows' | 'mac' | 'other';
 }
 
 export function detectPlatform(): Platform {
@@ -49,7 +50,8 @@ export function detectPlatform(): Platform {
         : /Safari\//.test(ua)
           ? 'safari'
           : 'other';
-  return { ios, standalone, iosOtherBrowser, browser };
+  const os = ios ? 'ios' : /Android/.test(ua) ? 'android' : /Windows/.test(ua) ? 'windows' : /Mac OS X|Macintosh/.test(ua) ? 'mac' : 'other';
+  return { ios, standalone, iosOtherBrowser, browser, os };
 }
 
 /** Whether the browser offered an install prompt, and a function to show it. */

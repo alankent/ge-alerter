@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { userIdFrom } from './bearer.js';
 import { notificationInputShape, type Notifier } from './notify.js';
+import { PLATFORMS, setupInstructions } from './setupGuide.js';
 import type { Store } from './store/types.js';
 
 /** name is the stable id; title is what MCP clients show people. */
@@ -17,7 +18,8 @@ export function createMcpServer(notifier: Notifier, store: Store, setupUrl: stri
       'Use send_notification to alert the user on their desktop when a scheduled agent or workflow finishes, ' +
       'needs attention, or finds something worth reporting. Keep titles short and put details in body or data. ' +
       'Include a url to the conversation or result when you have one. ' +
-      `If the user asks how to get these alerts on a device, send them to ${setupUrl}`,
+      'If the user asks how to get notifications on a device, or send_notification reports no devices, call ' +
+      `get_setup_instructions and relay the steps, or send them to ${setupUrl}/install`,
   });
 
   server.registerTool(
@@ -41,10 +43,11 @@ export function createMcpServer(notifier: Notifier, store: Store, setupUrl: stri
       const summary =
         outcome.devices === 0
           ? `Notification saved to the inbox, but the user has not turned on notifications on any device, so nothing popped up. ` +
-            `Tell the user to open ${setupUrl} on each computer, phone or tablet where they want alerts and follow the steps there.`
+            `Tell the user to open ${setupUrl}/install on each computer, phone or tablet where they want notifications and follow the steps there, ` +
+            'or call get_setup_instructions to give them the steps.'
           : outcome.delivered === 0
             ? `Notification saved to the inbox, but none of the user's ${outcome.devices} device(s) accepted it. ` +
-              `Suggest they open ${setupUrl} and use Send test to check their setup.`
+              `Suggest they open ${setupUrl} and use Send test to check their setup; ${setupUrl}/install has help for each device.`
             : `Notification sent to ${outcome.delivered} of ${outcome.devices} device(s) and saved to the inbox.`;
       return {
         content: [{ type: 'text', text: summary }],
@@ -91,6 +94,29 @@ export function createMcpServer(notifier: Notifier, store: Store, setupUrl: stri
       const ok = await store.markRead(uid, id);
       return { content: [{ type: 'text', text: ok ? `Marked ${id} as read.` : `No notification with id ${id}.` }], isError: !ok };
     },
+  );
+
+  server.registerTool(
+    'get_setup_instructions',
+    {
+      title: 'Get device setup instructions',
+      description:
+        'Returns step-by-step instructions for setting up a device to receive these notifications (iPhone and iPad via ' +
+        'Safari and the Home Screen, Windows, Mac, Android, other). Call it when the user asks how to get notifications, ' +
+        'or when send_notification reports that no device received the notification, and relay the steps to the user.',
+      inputSchema: {
+        platform: z.enum(PLATFORMS).optional().describe('The device the user has, if known. Omit to get every platform.'),
+      },
+      outputSchema: {
+        setupUrl: z.string().describe('Open on the device to sign in and turn on notifications.'),
+        instructionsUrl: z.string().describe('Step-by-step instructions with pictures for every kind of device.'),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ platform }) => ({
+      content: [{ type: 'text', text: setupInstructions(setupUrl, platform) }],
+      structuredContent: { setupUrl, instructionsUrl: `${setupUrl}/install` },
+    }),
   );
 
   return server;

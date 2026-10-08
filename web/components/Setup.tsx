@@ -3,6 +3,7 @@
 import type { User } from 'firebase/auth';
 import { onValue, ref } from 'firebase/database';
 import { useEffect, useState, type ReactNode } from 'react';
+import { AddIcon, ShareIcon } from './Icons';
 import { db, isConfigured } from '@/lib/firebase';
 import { detectPlatform, useInstallPrompt, type Platform } from '@/lib/install';
 import { deviceKey, disablePush, enablePush, pushSupport, sendTestPush, type PushSupport } from '@/lib/push';
@@ -28,7 +29,13 @@ export function Setup() {
   // Home Screen app, so on iPhone and iPad installing comes first and everything else happens in the app.
   if (platform.ios && !platform.standalone) {
     return (
-      <Shell>
+      <Shell
+        footer={
+          <footer className="setup-footer muted small">
+            <a href="/install">Help for other devices</a>
+          </footer>
+        }
+      >
         <IosInstall otherBrowser={platform.iosOtherBrowser} />
       </Shell>
     );
@@ -44,6 +51,8 @@ export function Setup() {
           <span aria-hidden="true">·</span>
         </>
       )}
+      <a href="/install">Help for other devices</a>
+      <span aria-hidden="true">·</span>
       <a href="/advanced">Notification history and advanced settings</a>
     </footer>
   );
@@ -90,7 +99,7 @@ function Shell({ children, footer }: { children: ReactNode; footer?: ReactNode }
   );
 }
 
-function Step({ n, title, done, optional, children }: { n: number; title: string; done?: boolean; optional?: boolean; children: ReactNode }) {
+export function Step({ n, title, done, optional, children }: { n: number; title: string; done?: boolean; optional?: boolean; children: ReactNode }) {
   return (
     <li className={`step${done ? ' done' : ''}`}>
       <span className="step-num" aria-hidden="true">
@@ -217,24 +226,6 @@ function InstallStep({ platform }: { platform: Platform }) {
         <p className="small">This browser can’t install apps. Notifications still arrive while it’s running.</p>
       )}
     </Step>
-  );
-}
-
-function ShareIcon() {
-  return (
-    <svg className="inline-icon" viewBox="0 0 24 24" aria-label="Share" role="img">
-      <path d="M12 3v12M7.5 7.5 12 3l4.5 4.5" />
-      <path d="M8 11H6a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-2" />
-    </svg>
-  );
-}
-
-function AddIcon() {
-  return (
-    <svg className="inline-icon" viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="4" y="4" width="16" height="16" rx="3" />
-      <path d="M12 8v8M8 12h8" />
-    </svg>
   );
 }
 

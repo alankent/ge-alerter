@@ -471,3 +471,42 @@ li.step.done .step-num {
     color: #bbf7d0;
   }
 }
+
+/* ------------------------------------------------------------------ install page */
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 0 14px;
+}
+
+.tabs button {
+  border-radius: 999px;
+  padding: 6px 14px;
+  background: var(--surface);
+}
+
+.tabs button.active {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: transparent;
+}
+
+.install-intro {
+  margin: 16px 0 4px;
+}
+
+.pill.this-device {
+  margin: 14px 0 0;
+}
+
+details.trouble {
+  border-top: 1px solid var(--border);
+  padding: 12px 0 16px;
+}
+
+details.trouble p {
+  margin: 8px 0 0;
+}
