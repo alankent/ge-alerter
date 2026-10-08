@@ -67,7 +67,7 @@ function Connect() {
       <div className="card center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/icons/icon-192.png" alt="" />
-        <h1>Allow {info?.clientName ?? 'Gemini Enterprise'} to send you notifications?</h1>
+        <h1>Allow {info?.clientName ?? 'this app'} to send you notifications?</h1>
         {problem ? (
           <p className="error">{problem}</p>
         ) : (

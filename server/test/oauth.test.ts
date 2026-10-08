@@ -105,6 +105,17 @@ describe('authorization code flow', () => {
   });
 });
 
+describe('consent page requester name', () => {
+  it('names the app from its redirect URI', async () => {
+    const { requesterName } = await import('../src/oauth.js');
+    expect(requesterName('https://vertexaisearch.cloud.google.com/oauth-redirect', 'x')).toBe('Gemini Enterprise');
+    expect(requesterName('https://claude.ai/api/mcp/auth_callback', 'x')).toBe('Claude');
+    expect(requesterName('https://claude.com/api/mcp/auth_callback', 'x')).toBe('Claude');
+    expect(requesterName('http://localhost:8765/callback', 'x')).toBe('Claude Code');
+    expect(requesterName('https://other.example/cb', 'Fallback')).toBe('Fallback');
+  });
+});
+
 describe('token endpoint', () => {
   it('rejects bad client credentials and accepts HTTP Basic', async () => {
     const bad = await fetch(`${ctx.baseUrl}/oauth/token`, {

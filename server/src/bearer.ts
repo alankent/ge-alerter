@@ -21,7 +21,7 @@ export function bearerAuth(config: Config, store: Store) {
   const challenge = (res: Response, error: string, description: string, status = 401) => {
     res.setHeader(
       'WWW-Authenticate',
-      `Bearer realm="ge-alerter", error="${error}", error_description="${description}", resource_metadata="${config.publicUrl}/.well-known/oauth-protected-resource"`,
+      `Bearer realm="agent-notifications", error="${error}", error_description="${description}", resource_metadata="${config.publicUrl}/.well-known/oauth-protected-resource"`,
     );
     res.status(status).json({ error, error_description: description });
   };

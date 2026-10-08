@@ -6,7 +6,7 @@ import type { User } from 'firebase/auth';
 import { API_URL, db, firebaseConfig, messaging, VAPID_KEY } from './firebase';
 import { showLocalNotification, type PushData } from './notificationDisplay';
 
-const DEVICE_KEY_STORAGE = 'ge-alerter:deviceKey';
+const DEVICE_KEY_STORAGE = 'agent-notifications:deviceKey';
 
 /** Stable id for this browser profile so re-registrations overwrite the same record. */
 export function deviceKey(): string {

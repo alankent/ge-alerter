@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Provisions and deploys Agent Notifications (repo and resource ids: ge-alerter) into one Google Cloud / Firebase project.
+# Provisions and deploys Agent Notifications into one Google Cloud / Firebase project.
 # Safe to re-run: every step checks before it creates, so this is also the redeploy command.
+# docs/INSTALL.md walks through the whole installation, including the console steps around this script;
+# scripts/teardown.sh removes everything this script creates.
 #
 # Credentials, one of:
 #   GCP_SA_KEY        a service account JSON key, raw or base64-encoded on one line (never commit this)
@@ -14,7 +16,11 @@
 #   REGION            Cloud Run and database region (default us-central1)
 #   ONLY              "server" or "web" to deploy just one half
 #   FIREBASE_VAPID_KEY  your own Web Push key; the Firebase default key is used otherwise
-#   APP_NAME          id for this app's own database instance and hosting site (default <project>-ge-alerter)
+#   SLUG              prefix for every resource this script creates (default agent-notifications): Cloud Run
+#                     service <slug>-server, service account <slug>-run, secret <slug>-oauth-client-secret,
+#                     OAuth client id <slug>-<project number>
+#   DISPLAY_NAME      the Firebase web app's registered name, used to find it on re-runs (default Agent Notifications)
+#   APP_NAME          id for this app's own database instance and hosting site (default <project>-<slug>)
 #   ALLOWED_EMAIL_DOMAINS  comma-separated email domains that may sign in (default imdigital.com; set to empty to allow any)
 #   ALLOWED_LINKS     comma-separated hosts notification links may point to: "host", "*.domain", optionally followed
 #                     by a path prefix (default: the Gemini Enterprise web app and *.imdigital.com). Agents' other
@@ -33,13 +39,15 @@ MCP_CALLBACK_PORT="${MCP_CALLBACK_PORT:-8765}"
 # Gemini Enterprise's fixed redirect, Claude's connector callbacks (claude.ai today, claude.com announced), and Claude
 # Code's local callback, so the same OAuth client serves all of them.
 OAUTH_REDIRECT_URIS="https://vertexaisearch.cloud.google.com/oauth-redirect,https://claude.ai/api/mcp/auth_callback,https://claude.com/api/mcp/auth_callback,http://localhost:$MCP_CALLBACK_PORT/callback"
-SERVICE=ge-alerter-server
-RUNTIME_SA_NAME=ge-alerter-run
-SECRET_NAME=ge-alerter-oauth-client-secret
+SLUG="${SLUG:-agent-notifications}"
+DISPLAY_NAME="${DISPLAY_NAME:-Agent Notifications}"
+SERVICE="$SLUG-server"
+RUNTIME_SA_NAME="$SLUG-run"
+SECRET_NAME="$SLUG-oauth-client-secret"
 RUNTIME_SA="$RUNTIME_SA_NAME@$PROJECT_ID.iam.gserviceaccount.com"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # Database instance and hosting site ids are global, 6-30 chars, lowercase letters, digits and hyphens.
-APP_NAME="${APP_NAME:-$(printf '%s' "${PROJECT_ID}-ge-alerter" | tr 'A-Z_' 'a-z-' | cut -c1-30 | sed 's/-*$//')}"
+APP_NAME="${APP_NAME:-$(printf '%s' "${PROJECT_ID}-$SLUG" | tr 'A-Z_' 'a-z-' | cut -c1-30 | sed 's/-*$//')}"
 
 log() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
 
@@ -108,10 +116,10 @@ fi
 echo "  $DATABASE_URL"
 
 log "Firebase web app"
-# "GE Alerter" is the web app's registered display name and how re-runs find it; it is never shown to users.
-APP_ID="$(api GET "https://firebase.googleapis.com/v1beta1/projects/$PROJECT_ID/webApps" | json "(v.apps||[]).find(a=>a.displayName==='GE Alerter' && a.state!=='DELETED')?.appId")"
+# The web app's registered display name is how re-runs find it.
+APP_ID="$(api GET "https://firebase.googleapis.com/v1beta1/projects/$PROJECT_ID/webApps" | DISPLAY_NAME="$DISPLAY_NAME" json "(v.apps||[]).find(a=>a.displayName===process.env.DISPLAY_NAME && a.state!=='DELETED')?.appId")"
 if [[ -z "$APP_ID" ]]; then
-  OP="$(api POST "https://firebase.googleapis.com/v1beta1/projects/$PROJECT_ID/webApps" '{"displayName":"GE Alerter"}' | json "v.name")"
+  OP="$(api POST "https://firebase.googleapis.com/v1beta1/projects/$PROJECT_ID/webApps" "{\"displayName\":\"$DISPLAY_NAME\"}" | json "v.name")"
   [[ -n "$OP" ]] || { echo "Could not create the Firebase web app" >&2; exit 1; }
   APP_ID="$(wait_op "$OP" | json "v.appId")"
 fi
@@ -148,7 +156,7 @@ if [[ "${ONLY:-}" != "web" ]]; then
 
   log "Runtime service account"
   gcloud iam service-accounts describe "$RUNTIME_SA" >/dev/null 2>&1 \
-    || gcloud iam service-accounts create "$RUNTIME_SA_NAME" --display-name "GE Alerter (Cloud Run)" --quiet
+    || gcloud iam service-accounts create "$RUNTIME_SA_NAME" --display-name "$DISPLAY_NAME (Cloud Run)" --quiet
   for role in roles/firebasedatabase.admin roles/firebasecloudmessaging.admin roles/firebaseauth.viewer; do
     gcloud projects add-iam-policy-binding "$PROJECT_ID" --member "serviceAccount:$RUNTIME_SA" --role "$role" --condition=None --quiet >/dev/null
   done
@@ -163,7 +171,7 @@ if [[ "${ONLY:-}" != "web" ]]; then
     --service-account "$RUNTIME_SA" \
     --allow-unauthenticated \
     --min-instances 0 --max-instances 2 --memory 512Mi --cpu 1 \
-    --set-env-vars "^@^STORE=firebase@FIREBASE_DATABASE_URL=$DATABASE_URL@FIREBASE_PROJECT_ID=$PROJECT_ID@PUBLIC_URL=$PUBLIC_URL@WEB_URL=$WEB_URL@OAUTH_CLIENT_ID=ge-alerter-$PROJECT_NUMBER@OAUTH_CLIENT_NAME=Gemini Enterprise@OAUTH_REDIRECT_URIS=$OAUTH_REDIRECT_URIS@ALLOWED_EMAIL_DOMAINS=$ALLOWED_EMAIL_DOMAINS@ALLOWED_LINKS=$ALLOWED_LINKS" \
+    --set-env-vars "^@^STORE=firebase@FIREBASE_DATABASE_URL=$DATABASE_URL@FIREBASE_PROJECT_ID=$PROJECT_ID@PUBLIC_URL=$PUBLIC_URL@WEB_URL=$WEB_URL@OAUTH_CLIENT_ID=$SLUG-$PROJECT_NUMBER@OAUTH_REDIRECT_URIS=$OAUTH_REDIRECT_URIS@ALLOWED_EMAIL_DOMAINS=$ALLOWED_EMAIL_DOMAINS@ALLOWED_LINKS=$ALLOWED_LINKS" \
     --set-secrets "OAUTH_CLIENT_SECRET=$SECRET_NAME:latest"
   if curl -fsS --max-time 30 "$PUBLIC_URL/healthz" >/dev/null 2>&1; then echo "  health check ok"
   else echo "  (could not reach $PUBLIC_URL/healthz from here; check it in a browser)"; fi
@@ -257,7 +265,7 @@ Gemini Enterprise custom MCP server data store:
   MCP server URL:      $PUBLIC_URL/mcp
   Authorization URL:   $PUBLIC_URL/oauth/authorize
   Token URL:           $PUBLIC_URL/oauth/token
-  Client ID:           ge-alerter-$PROJECT_NUMBER
+  Client ID:           $SLUG-$PROJECT_NUMBER
   Client secret:       gcloud secrets versions access latest --secret $SECRET_NAME --project $PROJECT_ID
   Scopes:              notifications
 
@@ -265,8 +273,8 @@ Try it from Claude:
   claude.ai / Claude Code web: Customize > Connectors > Add custom connector, URL $PUBLIC_URL/mcp,
     Advanced settings: the client ID and secret above.
   Claude Code on a laptop (the secret is prompted for, then kept in your keychain):
-    claude mcp add --transport http --client-id ge-alerter-$PROJECT_NUMBER --client-secret \
-      --callback-port $MCP_CALLBACK_PORT ge-alerter $PUBLIC_URL/mcp
+    claude mcp add --transport http --client-id $SLUG-$PROJECT_NUMBER --client-secret \
+      --callback-port $MCP_CALLBACK_PORT agent-notifications $PUBLIC_URL/mcp
     then run /mcp and sign in.
 ------------------------------------------------------------------------------
 MSG

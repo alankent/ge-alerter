@@ -14,7 +14,7 @@ export interface Config {
   /** OAuth client credentials that Gemini Enterprise presents. */
   oauthClientId: string;
   oauthClientSecret: string;
-  /** Human readable client name shown on the consent page. */
+  /** Name shown on the consent page when the redirect URI does not identify the requester (see oauth.ts). */
   oauthClientName: string;
   /** Exact redirect URIs the OAuth client may use. */
   oauthRedirectUris: string[];
@@ -81,7 +81,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     webUrl,
     oauthClientId: oauthClientId || 'dev-client',
     oauthClientSecret: oauthClientSecret || 'dev-secret',
-    oauthClientName: env.OAUTH_CLIENT_NAME ?? 'Gemini Enterprise',
+    oauthClientName: env.OAUTH_CLIENT_NAME ?? 'An AI assistant',
     oauthRedirectUris: redirectUris,
     accessTokenTtlSeconds: intEnv(env, 'ACCESS_TOKEN_TTL_SECONDS', 3600),
     refreshTokenTtlSeconds: intEnv(env, 'REFRESH_TOKEN_TTL_SECONDS', 90 * 24 * 3600),

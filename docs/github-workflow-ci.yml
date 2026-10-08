@@ -21,4 +21,4 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: '1'
       - name: Build server container
-        run: docker build -t ge-alerter-server ./server
+        run: docker build -t agent-notifications-server ./server

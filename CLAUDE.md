@@ -1,4 +1,4 @@
-# ge-alerter
+# Agent Notifications (repository: ge-alerter)
 
 npm workspaces monorepo: `server/` (Express + MCP SDK + Firebase Admin, deployed to Cloud Run) and `web/` (Next.js static
 export PWA on Firebase Hosting). See `README.md` for setup and `docs/ARCHITECTURE.md` for design.
@@ -22,6 +22,9 @@ Deploying (cloud sessions):
 - Credentials come from environment variables `GCP_PROJECT_ID` and `GCP_SA_KEY` (service account JSON, raw or base64) set in the
   Claude Code environment settings. Never write them to a file in the repo, print them, or commit them.
 - Run `./scripts/bootstrap.sh` from the repo root. It is idempotent; `ONLY=server` or `ONLY=web` deploys one half.
+  `docs/INSTALL.md` is the installation guide; keep it in step with the scripts. `scripts/teardown.sh` uninstalls
+  (dry run unless `CONFIRM=<APP_NAME>`). Resource names derive from `SLUG` (default `agent-notifications`).
+- Never delete the Google Cloud project: it is shared with other apps.
 - Do not print the OAuth client secret; tell the user the `gcloud secrets versions access` command instead.
 - If `GCP_SA_KEY` is not set, Google credentials come from a network secret: the agent proxy attaches tokens to
   `*.googleapis.com` requests and gcloud runs on the placeholder `CLOUDSDK_AUTH_ACCESS_TOKEN`. The script needs no

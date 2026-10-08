@@ -1,4 +1,4 @@
-// Generates the PWA icons as PNGs with no dependencies (a bell on an indigo tile).
+// Generates the PWA icons as PNGs with no dependencies (a white bell on a fluorescent pink tile, #FF1493).
 import { deflateSync } from 'node:zlib';
 import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -72,7 +72,7 @@ function coverage(d, px) {
 }
 
 function tile(size, { maskable }) {
-  const bg = [79, 70, 229];
+  const bg = [255, 20, 147];
   const radius = maskable ? 0 : 0.22 * size;
   const scale = maskable ? 0.62 : 0.78;
   return png(size, (x, y) => {

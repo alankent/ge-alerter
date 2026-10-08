@@ -1,5 +1,5 @@
 {
-  "name": "ge-alerter",
+  "name": "agent-notifications",
   "private": true,
   "description": "Desktop notifications from Gemini Enterprise agents and workflows: an MCP server on Cloud Run plus a Chrome PWA, built on Firebase (zero cost when idle).",
   "workspaces": [

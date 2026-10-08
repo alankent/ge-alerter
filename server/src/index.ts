@@ -30,7 +30,7 @@ async function main() {
 
   const app = createApp({ config, store, pusher, identity });
   app.listen(config.port, '0.0.0.0', () => {
-    console.log(`ge-alerter server listening on :${config.port} (public ${config.publicUrl}, web ${config.webUrl}, store ${config.store})`);
+    console.log(`agent-notifications server listening on :${config.port} (public ${config.publicUrl}, web ${config.webUrl}, store ${config.store})`);
   });
 }
 

@@ -1,5 +1,5 @@
 {
-  "name": "@ge-alerter/server",
+  "name": "@agent-notifications/server",
   "version": "0.1.0",
   "private": true,
   "description": "MCP server + OAuth authorization server that turns Gemini Enterprise tool calls into desktop notifications.",

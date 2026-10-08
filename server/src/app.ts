@@ -48,7 +48,7 @@ export function createApp({ config, store, pusher, identity }: AppDeps) {
   });
 
   app.get('/', (_req, res) => {
-    res.type('text').send(`Agent Notifications MCP server (ge-alerter)\n\nMCP endpoint: ${config.publicUrl}/mcp\nApp: ${config.webUrl}\n`);
+    res.type('text').send(`Agent Notifications MCP server\n\nMCP endpoint: ${config.publicUrl}/mcp\nApp: ${config.webUrl}\n`);
   });
 
   app.use(createOAuthRouter({ config, store, identity }));

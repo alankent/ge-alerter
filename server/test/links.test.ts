@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { isAllowedLink, parseAllowedLinks } from '../src/links.js';
 
-const APP = 'https://ak-sw50-ge-alerter.web.app';
+const APP = 'https://ak-sw50-agent-notifications.web.app';
 const allowed = parseAllowedLinks('vertexaisearch.cloud.google.com/home/cid/abc/, *.imdigital.com');
 
 describe('notification link allow-list', () => {

@@ -1,5 +1,5 @@
 {
-  "name": "@ge-alerter/web",
+  "name": "@agent-notifications/web",
   "version": "0.1.0",
   "private": true,
   "description": "Installable Chrome PWA: live inbox of Gemini Enterprise notifications with desktop push.",

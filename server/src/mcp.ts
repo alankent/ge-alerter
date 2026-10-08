@@ -6,7 +6,7 @@ import { PLATFORMS, setupInstructions } from './setupGuide.js';
 import type { Store } from './store/types.js';
 
 /** name is the stable id; title is what MCP clients show people. */
-export const SERVER_INFO = { name: 'ge-alerter', title: 'Agent Notifications', version: '0.1.0' };
+export const SERVER_INFO = { name: 'agent-notifications', title: 'Agent Notifications', version: '0.1.0' };
 
 /**
  * Builds the MCP server that Gemini Enterprise talks to. A fresh instance is

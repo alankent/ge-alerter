@@ -328,7 +328,7 @@ main.setup {
   width: 76px;
   height: 76px;
   border-radius: 20px;
-  box-shadow: 0 6px 20px rgb(79 70 229 / 0.25);
+  box-shadow: 0 6px 20px rgb(255 20 147 / 0.35);
 }
 
 .hero h1 {

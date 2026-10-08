@@ -83,6 +83,23 @@ function readClientCredentials(req: Request): { clientId?: string; clientSecret?
   return { clientId: firstString(body.client_id), clientSecret: firstString(body.client_secret) };
 }
 
+/**
+ * Who is asking, for the consent page. One OAuth client serves Gemini Enterprise, Claude and Claude Code; they are
+ * told apart by the redirect URI they registered.
+ */
+export function requesterName(redirectUri: string, fallback: string): string {
+  let host = '';
+  try {
+    host = new URL(redirectUri).hostname;
+  } catch {
+    return fallback;
+  }
+  if (host === 'vertexaisearch.cloud.google.com') return 'Gemini Enterprise';
+  if (host === 'claude.ai' || host === 'claude.com') return 'Claude';
+  if (host === 'localhost' || host === '127.0.0.1') return 'Claude Code';
+  return fallback;
+}
+
 export function createOAuthRouter({ config, store, identity }: Deps): Router {
   const router = Router();
 
@@ -112,7 +129,7 @@ export function createOAuthRouter({ config, store, identity }: Deps): Router {
     const codeChallengeMethod = firstString(q.code_challenge_method) ?? (codeChallenge ? 'plain' : undefined);
 
     if (!clientId || clientId !== config.oauthClientId) {
-      return errorPage(res, 400, 'Unknown client_id. Check the OAuth client ID configured in Gemini Enterprise.');
+      return errorPage(res, 400, 'Unknown client_id. Check the OAuth client ID in the connector settings.');
     }
     const effectiveRedirect = redirectUri ?? (config.oauthRedirectUris.length === 1 ? config.oauthRedirectUris[0] : undefined);
     if (!effectiveRedirect || !config.oauthRedirectUris.includes(effectiveRedirect)) {
@@ -152,11 +169,11 @@ export function createOAuthRouter({ config, store, identity }: Deps): Router {
   router.get('/oauth/request/:id', async (req, res) => {
     const pending = await store.peekPendingAuth(req.params.id as string);
     if (!pending || pending.exp < Date.now()) {
-      return oauthError(res, 404, 'not_found', 'This authorization request has expired. Start again from Gemini Enterprise.');
+      return oauthError(res, 404, 'not_found', 'This authorization request has expired. Start the connection again.');
     }
     res.json({
       clientId: pending.clientId,
-      clientName: config.oauthClientName,
+      clientName: requesterName(pending.redirectUri, config.oauthClientName),
       allowedEmailDomains: config.allowedEmailDomains,
       scope: pending.scope ?? SCOPES.join(' '),
       expiresAt: pending.exp,
@@ -188,7 +205,7 @@ export function createOAuthRouter({ config, store, identity }: Deps): Router {
 
     const pending = await store.takePendingAuth(requestId);
     if (!pending || pending.exp < Date.now()) {
-      return oauthError(res, 404, 'not_found', 'This authorization request has expired. Start again from Gemini Enterprise.');
+      return oauthError(res, 404, 'not_found', 'This authorization request has expired. Start the connection again.');
     }
 
     const redirect = new URL(pending.redirectUri);
