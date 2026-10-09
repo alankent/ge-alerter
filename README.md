@@ -37,7 +37,7 @@ costs nothing while nothing is happening.
 
 | Tool | Purpose |
 | --- | --- |
-| `send_notification` | `title`, optional `body`, `url`, up to two `actions` (`{title, url}`), `priority`, `tags`, `data`. Stores the alert in the user's inbox and pushes it to every registered browser. |
+| `send_notification` | `title`, optional `body`, `url`, up to two `actions` (`{title, url}`), `priority`, `tags`, `data`. Stores the alert in the user's inbox and pushes it to every registered browser. Oversized or messy input (long text, empty or invalid links, extra buttons, non-text data) is shortened or cleaned rather than refused, and the result says what changed. |
 | `list_notifications` | Recent inbox entries, optionally unread only. Lets an agent avoid repeating itself. |
 | `mark_notification_read` | Marks an entry read. |
 | `get_setup_instructions` | Optional `platform` (`ios`, `windows`, `mac`, `android`, `other`). Returns the setup page and the per-device instructions page (`/install`) with steps the agent can relay, so an agent can tell a user how to start receiving notifications. Read-only, so Gemini Enterprise runs it without asking for confirmation. |

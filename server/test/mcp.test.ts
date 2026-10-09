@@ -37,7 +37,9 @@ describe('MCP endpoint', () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(['get_setup_instructions', 'list_notifications', 'mark_notification_read', 'send_notification']);
     const send = tools.find((t) => t.name === 'send_notification');
-    expect(send?.inputSchema.required).toEqual(['title']);
+    // Nothing is required: scheduled runs must not lose a notification to a schema refusal.
+    expect(send?.inputSchema.required ?? []).toEqual([]);
+    expect(Object.keys(send?.inputSchema.properties ?? {})).toContain('title');
     // Gemini Enterprise only runs a tool without asking for confirmation when it is marked read-only;
     // scheduled agents must be able to notify unattended.
     expect(send?.annotations?.readOnlyHint).toBe(true);
@@ -176,10 +178,60 @@ describe('MCP endpoint', () => {
     await client.close();
   });
 
-  it('validates tool input', async () => {
+  it('fits oversized or messy input instead of refusing it, and says what changed', async () => {
+    ctx.store.devices.set('alice-uid', [{ key: 'd1', token: 'tok-1' }]);
     const client = await connect();
-    const result = await client.callTool({ name: 'send_notification', arguments: { title: '', url: 'ftp://nope' } });
-    expect(result.isError).toBe(true);
+    const longBody = 'Line one of the summary.\n' + 'x'.repeat(6000);
+    const result = await client.callTool({
+      name: 'send_notification',
+      arguments: {
+        title: 'T'.repeat(300),
+        body: longBody,
+        url: '',
+        actions: [
+          { title: 'Open', url: 'https://ge.example/run' },
+          { title: 'Bad', url: 'ftp://nope' },
+          { title: 'Two', url: 'https://ge.example/2' },
+          { title: 'Three', url: 'https://ge.example/3' },
+        ],
+        priority: 'URGENT',
+        tags: Array.from({ length: 15 }, (_, i) => `tag-${i}`),
+        data: { runId: 42, ok: true, empty: null, nested: { a: 1 } },
+      },
+    });
+    expect(result.isError).toBeFalsy();
+    const out = result.structuredContent as { delivered: number; adjustments: string[] };
+    expect(out.delivered).toBe(1);
+    expect(out.adjustments.join(' ')).toContain('title was shortened');
+    expect(out.adjustments.join(' ')).toContain('body was shortened');
+    expect((result.content as { text: string }[])[0].text).toContain('Adjusted:');
+
+    const stored = ctx.store.notifications.get('alice-uid')?.[0];
+    expect(stored?.title).toHaveLength(120);
+    expect(stored?.body).toHaveLength(4000);
+    expect(stored?.url).toBeUndefined();
+    expect(stored?.actions).toEqual([
+      { title: 'Open', url: 'https://ge.example/run' },
+      { title: 'Two', url: 'https://ge.example/2' },
+    ]);
+    expect(stored?.priority).toBe('high');
+    expect(stored?.tags).toHaveLength(10);
+    expect(stored?.data).toEqual({ runId: '42', ok: 'true', nested: '{"a":1}' });
+    // The push stays well inside FCM's 4 KB data limit.
+    const push = ctx.pusher.sent[0];
+    expect(push.data.body.length).toBeLessThanOrEqual(500);
+    expect(JSON.stringify(push.data).length).toBeLessThan(4096);
+    await client.close();
+  });
+
+  it('accepts a call with no title or nulls for optional fields', async () => {
+    const client = await connect();
+    const result = await client.callTool({
+      name: 'send_notification',
+      arguments: { title: null, body: 'Build finished\nAll green', url: null, actions: null, tags: null, data: null, priority: null },
+    });
+    expect(result.isError).toBeFalsy();
+    expect(ctx.store.notifications.get('alice-uid')?.[0].title).toBe('Build finished');
     await client.close();
   });
 
@@ -221,7 +273,14 @@ describe('REST endpoint', () => {
       headers: { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` },
       body: JSON.stringify({ body: 'no title' }),
     });
-    expect(bad.status).toBe(400);
+    expect(bad.status).toBe(201); // a title is made from the body
+
+    const wrongType = await fetch(`${ctx.baseUrl}/api/notify`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ title: 123, tags: 'not-a-list' }),
+    });
+    expect(wrongType.status).toBe(400);
   });
 });
 
