@@ -111,7 +111,7 @@ describe('consent page requester name', () => {
     expect(requesterName('https://vertexaisearch.cloud.google.com/oauth-redirect', 'x')).toBe('Gemini Enterprise');
     expect(requesterName('https://claude.ai/api/mcp/auth_callback', 'x')).toBe('Claude');
     expect(requesterName('https://claude.com/api/mcp/auth_callback', 'x')).toBe('Claude');
-    expect(requesterName('http://localhost:8765/callback', 'x')).toBe('Claude Code');
+    expect(requesterName('http://localhost:8765/callback', 'x')).toBe('An app on your computer (such as Claude Code)');
     expect(requesterName('https://other.example/cb', 'Fallback')).toBe('Fallback');
   });
 });

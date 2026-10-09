@@ -8,6 +8,7 @@ import type {
   Pusher,
   PushResult,
   RefreshToken,
+  RegisteredClient,
   Store,
   UserSettings,
   VerifiedUser,
@@ -17,6 +18,7 @@ import type {
 export class MemoryStore implements Store {
   pending = new Map<string, PendingAuth>();
   codes = new Map<string, AuthCode>();
+  clients = new Map<string, RegisteredClient>();
   accessTokens = new Map<string, AccessToken>();
   refreshTokens = new Map<string, RefreshToken>();
   settings = new Map<string, UserSettings>();
@@ -34,6 +36,12 @@ export class MemoryStore implements Store {
   }
   async peekPendingAuth(id: string): Promise<PendingAuth | null> {
     return this.pending.get(id) ?? null;
+  }
+  async putClient(clientId: string, client: RegisteredClient): Promise<void> {
+    this.clients.set(clientId, client);
+  }
+  async getClient(clientId: string): Promise<RegisteredClient | null> {
+    return this.clients.get(clientId) ?? null;
   }
   async putCode(codeHash: string, code: AuthCode): Promise<void> {
     this.codes.set(codeHash, code);

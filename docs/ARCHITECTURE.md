@@ -57,7 +57,9 @@ Express application with three responsibilities:
 
 1. **OAuth 2.0 authorization server** (`src/oauth.ts`). Authorization-code grant with PKCE, refresh tokens, client
    authentication via form body or HTTP Basic, and RFC 8414 / RFC 9728 metadata so spec-following MCP clients (Claude,
-   the MCP Inspector) also work. It has no login UI of its own: `/oauth/authorize` parks the request and redirects to the
+   the MCP Inspector) also work. Gemini Enterprise uses one static client with a secret; other clients such as Claude
+   register themselves (RFC 7591 dynamic client registration) as public clients that must use PKCE and may only
+   redirect to Claude's callbacks or a loopback address. It has no login UI of its own: `/oauth/authorize` parks the request and redirects to the
    PWA's `/connect` page. The PWA authenticates the user with Firebase Auth (Google sign-in) and posts the decision back
    with a Firebase ID token; the server verifies the ID token with the Admin SDK, mints a one-time code, and sends the
    browser to Google's redirect URI. Tokens are opaque random strings stored SHA-256 hashed in Realtime Database.

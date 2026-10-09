@@ -80,7 +80,8 @@ Settings (environment variables):
 | `APP_NAME` | `<project>-<slug>` | Database instance and hosting site id (globally unique, 6–30 chars). |
 | `ALLOWED_EMAIL_DOMAINS` | `imdigital.com` | Who may sign in, connect and read data. Empty allows any Google account. |
 | `ALLOWED_LINKS` | `vertexaisearch.cloud.google.com,*.imdigital.com` | Where notification links may point (see step 6). Empty allows any link. |
-| `MCP_CALLBACK_PORT` | `8765` | Port of Claude Code's local OAuth callback. |
+| `DYNAMIC_CLIENT_REGISTRATION` | `true` | Lets Claude connect without a client ID or secret (step 7). |
+| `MCP_CALLBACK_PORT` | `8765` | Port allowed for Claude Code's local callback when it uses the static client. |
 | `ONLY` | | `server` or `web` to redeploy one half. |
 | `FIREBASE_VAPID_KEY` | Firebase default | Your own Web Push key, if you want one. |
 
@@ -151,20 +152,27 @@ so each person's agents notify only that person.
 
 ## 7. Connect Claude (optional)
 
-The same OAuth client works from Claude; the server already allows Claude's callback URLs.
+Claude needs no client ID or secret: the server supports dynamic client registration, so Claude registers itself the
+first time it connects. Registered clients are public clients that must use PKCE (S256) and may only return to
+Claude's callbacks (`https://claude.ai/api/mcp/auth_callback`, `https://claude.com/api/mcp/auth_callback`) or a
+loopback address on the user's own computer, on any port. Each user still signs in with their work account and clicks
+**Allow**, and the token is bound to them. Gemini Enterprise keeps using the static client ID and secret from step 6.
 
 - **claude.ai, the Claude apps and Claude Code on the web:** [Customize → Connectors](https://claude.ai/customize/connectors)
-  → **Add custom connector**. Name it Agent Notifications, enter `https://<SERVICE URL>/mcp`, and under **Advanced
-  settings** the client ID and secret (the server does not support dynamic client registration). Connect and allow.
-  New Claude Code web sessions then have the tools.
-- **Claude Code on a computer** (version 2.1.231 or later):
+  → **Add custom connector**. Name it Agent Notifications, enter `https://<SERVICE URL>/mcp` and leave **Advanced
+  settings** empty. Connect, sign in and allow. New Claude Code web sessions then have the tools.
+- **Claude Code on a computer:**
 
   ```bash
-  claude mcp add --transport http --client-id agent-notifications-<project number> --client-secret \
-    --callback-port 8765 agent-notifications https://<SERVICE URL>/mcp
+  claude mcp add --transport http agent-notifications https://<SERVICE URL>/mcp
   ```
 
-  It prompts for the secret and keeps it in your keychain. Run `/mcp`, pick **agent-notifications** and sign in.
+  Then run `/mcp`, pick **agent-notifications** and sign in. Claude Code receives the sign-in on a loopback address
+  (`http://localhost:<random port>/callback`), which the server accepts.
+
+To turn dynamic registration off, redeploy with `DYNAMIC_CLIENT_REGISTRATION=false`; Claude can then still connect
+with the static client ID and secret under **Advanced settings** (Claude Code: `--client-id ... --client-secret
+--callback-port 8765`).
 
 ## 8. Use it from agents and workflows
 

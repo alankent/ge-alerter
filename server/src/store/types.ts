@@ -27,6 +27,18 @@ export interface AuthCode {
   exp: number;
 }
 
+/** A client that registered itself through dynamic client registration (RFC 7591), e.g. Claude. */
+export interface RegisteredClient {
+  /** Self-asserted, so never shown as proof of identity. */
+  clientName?: string;
+  redirectUris: string[];
+  /** "none" for public clients (PKCE only), otherwise the client authenticates with its secret. */
+  tokenEndpointAuthMethod: 'none' | 'client_secret_post' | 'client_secret_basic';
+  /** sha256 of the client secret, for clients that asked for one. */
+  secretHash?: string;
+  createdAt: number;
+}
+
 export interface AccessToken {
   uid: string;
   clientId: string;
@@ -89,6 +101,9 @@ export interface Store {
   /** Returns and deletes the pending authorization request. */
   takePendingAuth(id: string): Promise<PendingAuth | null>;
   peekPendingAuth(id: string): Promise<PendingAuth | null>;
+
+  putClient(clientId: string, client: RegisteredClient): Promise<void>;
+  getClient(clientId: string): Promise<RegisteredClient | null>;
 
   putCode(codeHash: string, code: AuthCode): Promise<void>;
   takeCode(codeHash: string): Promise<AuthCode | null>;

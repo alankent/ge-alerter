@@ -28,6 +28,10 @@ export interface Config {
   allowedEmailDomains: string[];
   /** Hosts (optionally with a path prefix) that notification links may point to; see links.ts. Empty allows any. */
   allowedLinks: string[];
+  /** Whether clients such as Claude may register themselves (RFC 7591); Gemini Enterprise uses the static client. */
+  dynamicRegistration: boolean;
+  /** Redirect URIs a dynamically registered client may use, besides loopback addresses on the user's machine. */
+  dynamicRedirectUris: string[];
   /** Which backing store to use. */
   store: 'firebase' | 'memory';
   firebaseDatabaseUrl?: string;
@@ -91,6 +95,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       .map((d) => d.trim().toLowerCase().replace(/^@/, ''))
       .filter(Boolean),
     allowedLinks: parseAllowedLinks(env.ALLOWED_LINKS),
+    dynamicRegistration: (env.DYNAMIC_CLIENT_REGISTRATION ?? 'true').toLowerCase() !== 'false',
+    dynamicRedirectUris: (env.DCR_REDIRECT_URIS ?? 'https://claude.ai/api/mcp/auth_callback,https://claude.com/api/mcp/auth_callback')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
     store,
     firebaseDatabaseUrl: env.FIREBASE_DATABASE_URL,
     firebaseProjectId: env.FIREBASE_PROJECT_ID ?? env.GOOGLE_CLOUD_PROJECT,

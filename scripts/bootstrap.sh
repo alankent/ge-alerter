@@ -25,6 +25,8 @@
 #   ALLOWED_LINKS     comma-separated hosts notification links may point to: "host", "*.domain", optionally followed
 #                     by a path prefix (default: the Gemini Enterprise web app and *.imdigital.com). Agents' other
 #                     links are dropped. Set to empty to allow any link.
+#   DYNAMIC_CLIENT_REGISTRATION  "true" (default) lets Claude connect without a client ID or secret by registering
+#                     itself (public client, PKCE, Claude callbacks or loopback only); "false" turns it off
 #   MCP_CALLBACK_PORT  localhost port Claude Code uses for its OAuth callback (default 8765); its redirect URI is allow-listed
 #
 # The app never touches the project's default database or default hosting site, so it can share a
@@ -35,6 +37,7 @@ PROJECT_ID="${GCP_PROJECT_ID:?Set GCP_PROJECT_ID}"
 REGION="${REGION:-us-central1}"
 ALLOWED_EMAIL_DOMAINS="${ALLOWED_EMAIL_DOMAINS-imdigital.com}"
 ALLOWED_LINKS="${ALLOWED_LINKS-vertexaisearch.cloud.google.com,*.imdigital.com}"
+DYNAMIC_CLIENT_REGISTRATION="${DYNAMIC_CLIENT_REGISTRATION:-true}"
 MCP_CALLBACK_PORT="${MCP_CALLBACK_PORT:-8765}"
 # Gemini Enterprise's fixed redirect, Claude's connector callbacks (claude.ai today, claude.com announced), and Claude
 # Code's local callback, so the same OAuth client serves all of them.
@@ -171,7 +174,7 @@ if [[ "${ONLY:-}" != "web" ]]; then
     --service-account "$RUNTIME_SA" \
     --allow-unauthenticated \
     --min-instances 0 --max-instances 2 --memory 512Mi --cpu 1 \
-    --set-env-vars "^@^STORE=firebase@FIREBASE_DATABASE_URL=$DATABASE_URL@FIREBASE_PROJECT_ID=$PROJECT_ID@PUBLIC_URL=$PUBLIC_URL@WEB_URL=$WEB_URL@OAUTH_CLIENT_ID=$SLUG-$PROJECT_NUMBER@OAUTH_REDIRECT_URIS=$OAUTH_REDIRECT_URIS@ALLOWED_EMAIL_DOMAINS=$ALLOWED_EMAIL_DOMAINS@ALLOWED_LINKS=$ALLOWED_LINKS" \
+    --set-env-vars "^@^STORE=firebase@FIREBASE_DATABASE_URL=$DATABASE_URL@FIREBASE_PROJECT_ID=$PROJECT_ID@PUBLIC_URL=$PUBLIC_URL@WEB_URL=$WEB_URL@OAUTH_CLIENT_ID=$SLUG-$PROJECT_NUMBER@OAUTH_REDIRECT_URIS=$OAUTH_REDIRECT_URIS@ALLOWED_EMAIL_DOMAINS=$ALLOWED_EMAIL_DOMAINS@ALLOWED_LINKS=$ALLOWED_LINKS@DYNAMIC_CLIENT_REGISTRATION=$DYNAMIC_CLIENT_REGISTRATION" \
     --set-secrets "OAUTH_CLIENT_SECRET=$SECRET_NAME:latest"
   if curl -fsS --max-time 30 "$PUBLIC_URL/healthz" >/dev/null 2>&1; then echo "  health check ok"
   else echo "  (could not reach $PUBLIC_URL/healthz from here; check it in a browser)"; fi
@@ -269,12 +272,11 @@ Gemini Enterprise custom MCP server data store:
   Client secret:       gcloud secrets versions access latest --secret $SECRET_NAME --project $PROJECT_ID
   Scopes:              notifications
 
-Try it from Claude:
-  claude.ai / Claude Code web: Customize > Connectors > Add custom connector, URL $PUBLIC_URL/mcp,
-    Advanced settings: the client ID and secret above.
-  Claude Code on a laptop (the secret is prompted for, then kept in your keychain):
-    claude mcp add --transport http --client-id $SLUG-$PROJECT_NUMBER --client-secret \
-      --callback-port $MCP_CALLBACK_PORT agent-notifications $PUBLIC_URL/mcp
+Connect from Claude (no client ID or secret needed; Claude registers itself):
+  claude.ai, Claude apps, Claude Code on the web: Customize > Connectors > Add custom connector,
+    URL $PUBLIC_URL/mcp, leave Advanced settings empty.
+  Claude Code on a computer:
+    claude mcp add --transport http agent-notifications $PUBLIC_URL/mcp
     then run /mcp and sign in.
 ------------------------------------------------------------------------------
 MSG

@@ -12,6 +12,7 @@ import type {
   Pusher,
   PushResult,
   RefreshToken,
+  RegisteredClient,
   Store,
   UserSettings,
   VerifiedUser,
@@ -40,6 +41,7 @@ export function initFirebase(options: FirebaseOptions): App {
 /*
  * Realtime Database layout
  *
+ *   /oauth/clients/{clientId}    RegisteredClient (server only)
  *   /oauth/pending/{id}          PendingAuth   (server only)
  *   /oauth/codes/{sha256}        AuthCode      (server only)
  *   /oauth/tokens/{sha256}       AccessToken   (server only)
@@ -94,6 +96,13 @@ export class FirebaseStore implements Store {
     return snap.exists() ? (snap.val() as PendingAuth) : null;
   }
 
+  async putClient(clientId: string, client: RegisteredClient): Promise<void> {
+    await this.db.ref(`oauth/clients/${clientId}`).set(client);
+  }
+  async getClient(clientId: string): Promise<RegisteredClient | null> {
+    const snap = await this.db.ref(`oauth/clients/${clientId}`).get();
+    return snap.exists() ? (snap.val() as RegisteredClient) : null;
+  }
   async putCode(codeHash: string, code: AuthCode): Promise<void> {
     await this.sweep('oauth/codes');
     await this.db.ref(`oauth/codes/${codeHash}`).set(code);

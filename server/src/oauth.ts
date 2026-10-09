@@ -1,17 +1,20 @@
 /**
  * A deliberately small OAuth 2.0 authorization server.
  *
- * Gemini Enterprise's custom MCP connector only speaks the authorization-code
- * grant with a pre-registered client (no dynamic client registration, no
- * discovery). The consent screen is the PWA: the user signs in with Google
- * there, approves, and the PWA calls back here to turn the pending request
- * into an authorization code. Tokens are opaque random strings stored hashed.
+ * Two kinds of client:
+ *   - the static client (OAUTH_CLIENT_ID + secret), which Gemini Enterprise needs because it does not do dynamic
+ *     client registration;
+ *   - dynamically registered clients (RFC 7591), which is how Claude connects without a secret. They are public
+ *     clients by default, must use PKCE (S256) and may only return to the redirect URIs in DCR_REDIRECT_URIS
+ *     (Claude's callbacks) or a loopback address on the user's machine (RFC 8252, any port).
+ * Either way the consent screen is the PWA: the user signs in with Google there, approves, and the PWA calls back
+ * here to turn the pending request into an authorization code. Tokens are opaque random strings stored hashed.
  */
 import { Router, type Request, type Response } from 'express';
 import type { Config } from './config.js';
 import { allowedDomainsText, isAllowedUser } from './access.js';
 import { randomToken, safeEqual, sha256, verifyPkce } from './crypto.js';
-import type { Identity, Store, VerifiedUser } from './store/types.js';
+import type { Identity, RegisteredClient, Store, VerifiedUser } from './store/types.js';
 
 const PENDING_TTL_MS = 10 * 60 * 1000;
 const CODE_TTL_MS = 5 * 60 * 1000;
@@ -31,10 +34,32 @@ export function authorizationServerMetadata(config: Config) {
     response_types_supported: ['code'],
     grant_types_supported: ['authorization_code', 'refresh_token'],
     code_challenge_methods_supported: ['S256', 'plain'],
-    token_endpoint_auth_methods_supported: ['client_secret_post', 'client_secret_basic'],
+    token_endpoint_auth_methods_supported: ['client_secret_post', 'client_secret_basic', ...(config.dynamicRegistration ? ['none'] : [])],
+    ...(config.dynamicRegistration ? { registration_endpoint: `${config.publicUrl}/oauth/register` } : {}),
     scopes_supported: SCOPES,
   };
 }
+
+function isLoopback(uri: string): boolean {
+  try {
+    const u = new URL(uri);
+    return u.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
+/** Exact match, except that a loopback redirect may use any port (RFC 8252 §7.3). */
+function redirectMatches(registered: string, requested: string): boolean {
+  if (registered === requested) return true;
+  if (!isLoopback(registered) || !isLoopback(requested)) return false;
+  const a = new URL(registered);
+  const b = new URL(requested);
+  return a.hostname === b.hostname && a.pathname === b.pathname && a.search === b.search;
+}
+
+const AUTH_METHODS = ['none', 'client_secret_post', 'client_secret_basic'] as const;
+const DYNAMIC_PREFIX = 'dyn_';
 
 export function protectedResourceMetadata(config: Config) {
   return {
@@ -96,12 +121,60 @@ export function requesterName(redirectUri: string, fallback: string): string {
   }
   if (host === 'vertexaisearch.cloud.google.com') return 'Gemini Enterprise';
   if (host === 'claude.ai' || host === 'claude.com') return 'Claude';
-  if (host === 'localhost' || host === '127.0.0.1') return 'Claude Code';
+  // Any app on the user's computer can use a loopback address, so do not claim it is Claude Code.
+  if (host === 'localhost' || host === '127.0.0.1' || host === '[::1]') return 'An app on your computer (such as Claude Code)';
   return fallback;
 }
 
 export function createOAuthRouter({ config, store, identity }: Deps): Router {
   const router = Router();
+
+  async function dynamicClient(clientId: string | undefined): Promise<RegisteredClient | null> {
+    if (!config.dynamicRegistration || !clientId?.startsWith(DYNAMIC_PREFIX)) return null;
+    return store.getClient(clientId);
+  }
+
+  /** Dynamic client registration (RFC 7591), used by Claude. */
+  router.post('/oauth/register', async (req, res) => {
+    if (!config.dynamicRegistration) return oauthError(res, 404, 'not_found', 'Dynamic client registration is turned off');
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const redirectUris = Array.isArray(body.redirect_uris) ? body.redirect_uris.filter((u): u is string => typeof u === 'string') : [];
+    if (redirectUris.length === 0 || redirectUris.length > 5) {
+      return oauthError(res, 400, 'invalid_redirect_uri', 'Provide between one and five redirect_uris');
+    }
+    const refused = redirectUris.filter((u) => !config.dynamicRedirectUris.includes(u) && !isLoopback(u));
+    if (refused.length) {
+      return oauthError(res, 400, 'invalid_redirect_uri', `These redirect URIs are not allowed for registered clients: ${refused.join(', ')}`);
+    }
+    const requested = typeof body.token_endpoint_auth_method === 'string' ? body.token_endpoint_auth_method : 'none';
+    if (!(AUTH_METHODS as readonly string[]).includes(requested)) {
+      return oauthError(res, 400, 'invalid_client_metadata', `Unsupported token_endpoint_auth_method: ${requested}`);
+    }
+    const method = requested as RegisteredClient['tokenEndpointAuthMethod'];
+    const clientName = typeof body.client_name === 'string' ? body.client_name.slice(0, 100) : undefined;
+    const clientId = DYNAMIC_PREFIX + randomToken(16);
+    const clientSecret = method === 'none' ? undefined : randomToken(32);
+    const now = Date.now();
+    await store.putClient(clientId, {
+      ...(clientName ? { clientName } : {}),
+      redirectUris,
+      tokenEndpointAuthMethod: method,
+      ...(clientSecret ? { secretHash: sha256(clientSecret) } : {}),
+      createdAt: now,
+    });
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(201).json({
+      client_id: clientId,
+      client_id_issued_at: Math.floor(now / 1000),
+      ...(clientSecret ? { client_secret: clientSecret, client_secret_expires_at: 0 } : {}),
+      ...(clientName ? { client_name: clientName } : {}),
+      redirect_uris: redirectUris,
+      grant_types: ['authorization_code', 'refresh_token'],
+      response_types: ['code'],
+      token_endpoint_auth_method: method,
+      scope: SCOPES.join(' '),
+    });
+  });
 
   router.get('/.well-known/oauth-authorization-server', (_req, res) => {
     res.json(authorizationServerMetadata(config));
@@ -128,11 +201,13 @@ export function createOAuthRouter({ config, store, identity }: Deps): Router {
     const codeChallenge = firstString(q.code_challenge);
     const codeChallengeMethod = firstString(q.code_challenge_method) ?? (codeChallenge ? 'plain' : undefined);
 
-    if (!clientId || clientId !== config.oauthClientId) {
-      return errorPage(res, 400, 'Unknown client_id. Check the OAuth client ID in the connector settings.');
+    const registered = clientId === config.oauthClientId ? null : await dynamicClient(clientId);
+    if (!clientId || (clientId !== config.oauthClientId && !registered)) {
+      return errorPage(res, 400, 'Unknown client_id. Check the OAuth client ID in the connector settings, or remove and re-add the connector.');
     }
-    const effectiveRedirect = redirectUri ?? (config.oauthRedirectUris.length === 1 ? config.oauthRedirectUris[0] : undefined);
-    if (!effectiveRedirect || !config.oauthRedirectUris.includes(effectiveRedirect)) {
+    const allowedRedirects = registered ? registered.redirectUris : config.oauthRedirectUris;
+    const effectiveRedirect = redirectUri ?? (allowedRedirects.length === 1 ? allowedRedirects[0] : undefined);
+    if (!effectiveRedirect || !allowedRedirects.some((r) => (registered ? redirectMatches(r, effectiveRedirect) : r === effectiveRedirect))) {
       return errorPage(res, 400, `redirect_uri is not registered for this client: ${redirectUri ?? '(missing)'}`);
     }
 
@@ -147,6 +222,9 @@ export function createOAuthRouter({ config, store, identity }: Deps): Router {
     if (responseType !== 'code') return redirectWithError('unsupported_response_type', 'Only response_type=code is supported');
     if (codeChallengeMethod && codeChallengeMethod !== 'S256' && codeChallengeMethod !== 'plain') {
       return redirectWithError('invalid_request', 'Unsupported code_challenge_method');
+    }
+    if (registered && (!codeChallenge || codeChallengeMethod !== 'S256')) {
+      return redirectWithError('invalid_request', 'Registered clients must use PKCE with S256');
     }
 
     const id = randomToken(24);
@@ -234,7 +312,14 @@ export function createOAuthRouter({ config, store, identity }: Deps): Router {
   /** Step 3: Gemini Enterprise's backend exchanges the code (or a refresh token). */
   router.post('/oauth/token', async (req, res) => {
     const { clientId, clientSecret } = readClientCredentials(req);
-    if (!clientId || !clientSecret || clientId !== config.oauthClientId || !safeEqual(clientSecret, config.oauthClientSecret)) {
+    const registered = clientId === config.oauthClientId ? null : await dynamicClient(clientId);
+    const authenticated =
+      clientId === config.oauthClientId
+        ? Boolean(clientSecret) && safeEqual(clientSecret as string, config.oauthClientSecret)
+        : registered
+          ? registered.tokenEndpointAuthMethod === 'none' || (Boolean(clientSecret) && safeEqual(sha256(clientSecret as string), registered.secretHash ?? ''))
+          : false;
+    if (!clientId || !authenticated) {
       res.setHeader('WWW-Authenticate', 'Basic realm="oauth"');
       return oauthError(res, 401, 'invalid_client', 'Client authentication failed');
     }
@@ -279,6 +364,9 @@ export function createOAuthRouter({ config, store, identity }: Deps): Router {
       const redirectUri = firstString(body.redirect_uri);
       if (redirectUri && redirectUri !== record.redirectUri) {
         return oauthError(res, 400, 'invalid_grant', 'redirect_uri does not match');
+      }
+      if (registered && !record.codeChallenge) {
+        return oauthError(res, 400, 'invalid_grant', 'PKCE is required for registered clients');
       }
       if (record.codeChallenge) {
         const verifier = firstString(body.code_verifier);
